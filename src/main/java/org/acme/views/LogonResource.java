@@ -11,6 +11,8 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.Collections;
+
 import org.acme.externo.SefazClient;
 import org.acme.views.ConsultaResource;
 
@@ -45,9 +47,10 @@ public class LogonResource {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode json = mapper.readTree(responseBody);
                 String accessToken = json.get("access_token").asText();
-
+                
                 return Response.ok(
-                        ConsultaResource.Templates.consulta(accessToken).render()
+                        ConsultaResource.Templates.consulta(accessToken)
+                        .data("itens", Collections.emptyList()).render()
                 ).build();
             } else {
                 return Response.status(Response.Status.UNAUTHORIZED)
