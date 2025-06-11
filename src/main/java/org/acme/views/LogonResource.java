@@ -39,7 +39,7 @@ public class LogonResource {
         try {
             Response loginResponse = sefazClient.login(username, password, "password", "68cdf21a37c40f9bf7eaa0bf9ac934e3");
             String responseBody = loginResponse.readEntity(String.class);
-            System.out.println("Resposta do login: " + responseBody);
+            //System.out.println("Resposta do login: " + responseBody);
 
             if (loginResponse.getStatus() == 200) {
                 ObjectMapper mapper = new ObjectMapper();

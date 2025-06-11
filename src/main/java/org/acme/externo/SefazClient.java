@@ -30,6 +30,6 @@ public interface SefazClient {
             @QueryParam("Latitude") double latitude,
             @QueryParam("NroKmDistancia") int nroKmDistancia,
             @QueryParam("NroDiaPrz") int nroDiaPrz,
-            @HeaderParam("Cookie") String cookie
+            @HeaderParam("Authorization") String authorization
     );
 }
