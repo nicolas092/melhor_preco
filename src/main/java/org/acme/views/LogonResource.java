@@ -30,6 +30,7 @@ public class LogonResource {
     @GET
     @Produces(MediaType.TEXT_HTML)
     public TemplateInstance mostrar() {
+        // Mensagem padrão que não exibe toast
         return Templates.logon("Informe seus dados");
     }
 
@@ -48,18 +49,18 @@ public class LogonResource {
 
                 return Response.ok(
                         ConsultaResource.Templates.consulta()
-                        .data("itens", Collections.emptyList())
-                        .data("token", accessToken)
-                        .render()
+                            .data("itens", Collections.emptyList())
+                            .data("token", accessToken)
+                            .render()
                 ).build();
             } else {
-                // Retorna a tela com mensagem de erro
+                // Exibe mensagem de erro
                 return Response.status(Response.Status.UNAUTHORIZED)
                         .entity(Templates.logon("Login ou senha inválidos").render())
                         .build();
             }
         } catch (Exception e) {
-            // Também trata qualquer exceção como erro de login
+            // Exibe mensagem de erro mesmo em falhas inesperadas
             return Response.status(Response.Status.UNAUTHORIZED)
                     .entity(Templates.logon("Login ou senha inválidos").render())
                     .build();

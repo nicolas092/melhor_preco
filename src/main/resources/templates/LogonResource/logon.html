@@ -54,11 +54,13 @@
                     <div class="card-body">
                         <h3 class="card-title text-center mb-4">Login</h3>
 
+                        <!-- Logo + Texto -->
                         <div class="d-flex align-items-center justify-content-center mb-3 gap-2">
                             <img src="/logo.png" alt="Logo" style="width: 32px; height: 32px;" />
                             <p class="text-danger m-0">Logue com a conta do Menor Preço</p>
                         </div>
 
+                        <!-- Formulário -->
                         <form action="/logon" method="post" enctype="application/x-www-form-urlencoded">
                             <div class="mb-3">
                                 <label for="username" class="form-label">Usuário</label>
@@ -68,6 +70,15 @@
                                 <label for="password" class="form-label">Senha</label>
                                 <input type="password" class="form-control" id="password" name="password" required />
                             </div>
+
+                            <!-- Link de registro -->
+                            <div class="mb-3 text-center" style="font-size: 0.85rem;">
+                                Não tem conta?
+                                <a href="https://nfg.sefaz.rs.gov.br/Cadastro/CadastroNfg_1.aspx" target="_blank" style="text-decoration: none;">
+                                    Registrar
+                                </a>
+                            </div>
+
                             <button type="submit" class="btn btn-primary w-100">Entrar</button>
                         </form>
                     </div>

@@ -13,6 +13,6 @@ public class MainResource {
     @GET
     @Produces(MediaType.TEXT_HTML)
     public String index() {
-        return LogonResource.Templates.logon("Chamado pela MainResource").render();
+        return LogonResource.Templates.logon("Logue novamente").render();
     }
 }
