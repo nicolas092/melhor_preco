@@ -4,15 +4,16 @@ import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
-import org.acme.externo.SefazClient;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.net.URI;
+import java.util.Collections;
+
+import org.acme.externo.SefazClient;
 
 @Path("/logon")
 public class LogonResource {
@@ -21,54 +22,48 @@ public class LogonResource {
     @RestClient
     SefazClient sefazClient;
 
-    @Inject
-    ObjectMapper objectMapper;
-
-    @CheckedTemplate(requireTypeSafeExpressions = false)
+    @CheckedTemplate
     public static class Templates {
-        public static native TemplateInstance logon();
+        public static native TemplateInstance logon(String mensagem);
     }
 
     @GET
     @Produces(MediaType.TEXT_HTML)
-    public TemplateInstance form() {
-        return Templates.logon().data("mensagem", "");
+    public TemplateInstance mostrar() {
+        // Mensagem padrão que não exibe toast
+        return Templates.logon("Informe seus dados");
     }
 
     @POST
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-    public Response autenticar(
-        @FormParam("username") String username,
-        @FormParam("password") String password,
-        @Context UriInfo uriInfo
-    ) {
+    @Produces(MediaType.TEXT_HTML)
+    public Response autenticar(@FormParam("username") String username, @FormParam("password") String password) {
         try {
-            String grantType = "password";
-            String privateKey = "nfg-sefaz"; // valor usado pela API da Sefaz
+            Response loginResponse = sefazClient.login(username, password, "password", "68cdf21a37c40f9bf7eaa0bf9ac934e3");
+            String responseBody = loginResponse.readEntity(String.class);
 
-            Response response = sefazClient.login(username, password, grantType, privateKey);
+            if (loginResponse.getStatus() == 200) {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode json = mapper.readTree(responseBody);
+                String accessToken = json.get("access_token").asText();
 
-            if (response.getStatus() != 200) {
                 return Response.ok(
-                    Templates.logon().data("mensagem", "Usuário ou senha inválidos.")
+                        ConsultaResource.Templates.consulta()
+                            .data("itens", Collections.emptyList())
+                            .data("token", accessToken)
+                            .render()
                 ).build();
+            } else {
+                // Exibe mensagem de erro
+                return Response.status(Response.Status.UNAUTHORIZED)
+                        .entity(Templates.logon("Login ou senha inválidos").render())
+                        .build();
             }
-
-            String json = response.readEntity(String.class);
-            JsonNode root = objectMapper.readTree(json);
-            String token = root.get("access_token").asText();
-
-            URI redirectUri = uriInfo.getBaseUriBuilder()
-                .path("/consulta")
-                .queryParam("token", token)
-                .build();
-
-            return Response.seeOther(redirectUri).build();
-
         } catch (Exception e) {
-            return Response.ok(
-                Templates.logon().data("mensagem", "Erro ao logar: " + e.getMessage())
-            ).build();
+            // Exibe mensagem de erro mesmo em falhas inesperadas
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Templates.logon("Login ou senha inválidos").render())
+                    .build();
         }
     }
 }
