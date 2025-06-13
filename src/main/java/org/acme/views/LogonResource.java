@@ -48,17 +48,21 @@ public class LogonResource {
 
                 return Response.ok(
                         ConsultaResource.Templates.consulta()
-                        .data("itens", Collections.emptyList()) // Pode colocar lista vazia aqui
+                        .data("itens", Collections.emptyList())
                         .data("token", accessToken)
                         .render()
                 ).build();
             } else {
+                // Retorna a tela com mensagem de erro
                 return Response.status(Response.Status.UNAUTHORIZED)
-                        .entity("Login externo falhou").build();
+                        .entity(Templates.logon("Login ou senha inválidos").render())
+                        .build();
             }
         } catch (Exception e) {
-            return Response.serverError()
-                    .entity("Erro no login externo: " + e.getMessage()).build();
+            // Também trata qualquer exceção como erro de login
+            return Response.status(Response.Status.UNAUTHORIZED)
+                    .entity(Templates.logon("Login ou senha inválidos").render())
+                    .build();
         }
     }
 }
