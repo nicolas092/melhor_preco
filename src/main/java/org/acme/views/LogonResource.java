@@ -6,7 +6,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriBuilder;
+
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,7 +14,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 
 import org.acme.externo.SefazClient;
-import org.acme.views.ConsultaResource;
 
 @Path("/logon")
 public class LogonResource {
@@ -41,16 +40,17 @@ public class LogonResource {
         try {
             Response loginResponse = sefazClient.login(username, password, "password", "68cdf21a37c40f9bf7eaa0bf9ac934e3");
             String responseBody = loginResponse.readEntity(String.class);
-            //System.out.println("Resposta do login: " + responseBody);
 
             if (loginResponse.getStatus() == 200) {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode json = mapper.readTree(responseBody);
                 String accessToken = json.get("access_token").asText();
-                
+
                 return Response.ok(
-                        ConsultaResource.Templates.consulta(accessToken)
-                        .data("itens", Collections.emptyList()).render()
+                        ConsultaResource.Templates.consulta()
+                        .data("itens", Collections.emptyList()) // Pode colocar lista vazia aqui
+                        .data("token", accessToken)
+                        .render()
                 ).build();
             } else {
                 return Response.status(Response.Status.UNAUTHORIZED)
@@ -61,6 +61,4 @@ public class LogonResource {
                     .entity("Erro no login externo: " + e.getMessage()).build();
         }
     }
-
-
 }

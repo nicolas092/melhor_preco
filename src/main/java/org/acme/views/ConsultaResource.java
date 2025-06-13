@@ -12,12 +12,8 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.print.attribute.standard.Media;
+import java.text.NumberFormat;
+import java.util.*;
 
 @Path("/consulta")
 public class ConsultaResource {
@@ -31,7 +27,7 @@ public class ConsultaResource {
 
     @CheckedTemplate(requireTypeSafeExpressions = false)
     public static class Templates {
-        public static native TemplateInstance consulta(String token);
+        public static native TemplateInstance consulta();  // Sem parâmetro aqui
     }
 
     @POST
@@ -52,21 +48,42 @@ public class ConsultaResource {
         List<Map<String, Object>> itens = (List<Map<String, Object>>) resposta.get("itens");
 
         List<Map<String, Object>> listaFormatada = new ArrayList<>();
+        NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
+
         for (Map<String, Object> item : itens) {
             Map<String, Object> estabelecimento = (Map<String, Object>) item.get("estabelecimento");
             Map<String, Object> mapItem = new HashMap<>();
-            mapItem.put("vlrItem", item.get("vlrItem"));
+
+            Double vlrItem = (Double) item.get("vlrItem");
+            String valorFormatado = formatter.format(vlrItem);  // R$ formatado
+            String texDesc = (String) item.get("texDesc");
+
+            mapItem.put("vlrItem", valorFormatado);
             mapItem.put("nomeContrib", estabelecimento.get("nomeContrib"));
             mapItem.put("nomeLograd", estabelecimento.get("nomeLograd"));
+            mapItem.put("texDesc", texDesc);
+
             listaFormatada.add(mapItem);
         }
 
-        String html = Templates.consulta(token)
+        String html = Templates.consulta()
             .data("itens", listaFormatada)
             .data("token", token)
-            .render(); // <-- aqui renderiza o HTML
+            .render();
 
         return Response.ok(html).build();
     }
-}
 
+    @POST
+    @Path("/limpar")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.TEXT_HTML)
+    public Response limpar(@FormParam("token") String accessToken) {
+        return Response.ok(
+            ConsultaResource.Templates.consulta()
+                .data("itens", Collections.emptyList())
+                .data("token", accessToken)
+                .render()
+        ).build();
+    }
+}
