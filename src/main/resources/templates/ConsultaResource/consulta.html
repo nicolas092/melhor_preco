@@ -27,11 +27,11 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="longitude" class="form-label">Longitude</label>
-                                    <input type="number" step="any" class="form-control" id="longitude" name="longitude" value="-51.1070345" required />
+                                    <input type="number" step="any" class="form-control" id="longitude" name="longitude" required />
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="latitude" class="form-label">Latitude</label>
-                                    <input type="number" step="any" class="form-control" id="latitude" name="latitude" value="-30.0666644" required />
+                                    <input type="number" step="any" class="form-control" id="latitude" name="latitude" required />
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="nroKmDistancia" class="form-label">Raio de Distância (Km)</label>
@@ -119,23 +119,38 @@
             $('#btnLimpar').click(function () {
                 const token = $('input[name="token"]').val();
 
-                // Criar formulário dinamicamente
                 const form = $('<form>', {
                     method: 'POST',
                     action: '/consulta/limpar'
                 });
 
-                // Adicionar campo token
                 form.append($('<input>', {
                     type: 'hidden',
                     name: 'token',
                     value: token
                 }));
 
-                // Adicionar e enviar o formulário
                 $('body').append(form);
                 form.submit();
             });
+        });
+
+        // Gerar latitude e longitude aleatórias próximas
+        function gerarVariacao(base, variacao) {
+            const offset = (Math.random() * 2 - 1) * variacao;
+            return (base + offset).toFixed(7);
+        }
+
+        const latitudeBase = -30.0666644;
+        const longitudeBase = -51.1070345;
+        const variacaoMaxima = 0.0004;
+
+        const latitudeAleatoria = gerarVariacao(latitudeBase, variacaoMaxima);
+        const longitudeAleatoria = gerarVariacao(longitudeBase, variacaoMaxima);
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('latitude').value = latitudeAleatoria;
+            document.getElementById('longitude').value = longitudeAleatoria;
         });
     </script>
 </body>
