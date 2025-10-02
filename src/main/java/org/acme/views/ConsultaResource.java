@@ -37,48 +37,76 @@ public class ConsultaResource {
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_HTML)
     public Response receber(
-        @FormParam("token") String token,
-        @FormParam("gtin") String gtin,
-        @FormParam("longitude") double longitude,
-        @FormParam("latitude") double latitude,
-        @FormParam("nroKmDistancia") int nroKmDistancia,
-        @FormParam("nroDiaPrz") int nroDiaPrz
+            @FormParam("token") String token,
+            @FormParam("gtin") String gtin,
+            @FormParam("longitude") double longitude,
+            @FormParam("latitude") double latitude,
+            @FormParam("nroKmDistancia") int nroKmDistancia,
+            @FormParam("nroDiaPrz") int nroDiaPrz
     ) throws Exception {
         String authHeader = "Bearer " + token;
-
 
         String jsonResponse = GtinUtils.isGtin(gtin)?
                 sefazClient.consultaItem(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader) : //se gtin
                 sefazClient.consultaItemPorDescricao(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader); // se nao
 
-        repo.salvarJson(jsonResponse);
+        // parse pra poder injetar produtoPadronizado (somente se não for GTIN)
+        Map<String, Object> root = objectMapper.readValue(jsonResponse, Map.class);
+        List<Map<String, Object>> itens = (List<Map<String, Object>>) root.get("itens");
 
-        Map<String, Object> resposta = objectMapper.readValue(jsonResponse, Map.class);
-        List<Map<String, Object>> itens = (List<Map<String, Object>>) resposta.get("itens");
+        if (!GtinUtils.isGtin(gtin) && itens != null) {
+            for (Map<String, Object> item : itens) {
+                // sobrescreve/insere produtoPadronizado com o input (descrição)
+                item.put("produtoPadronizado", gtin);
+            }
+            // reserializa e salva o JSON modificado
+            String modifiedJson = objectMapper.writeValueAsString(root);
+            repo.salvarJson(modifiedJson);
+        } else {
+            // se for GTIN ou não há itens, salva response original
+            repo.salvarJson(jsonResponse);
+        }
 
+        // monta listaFormatada para exibir na view (usa os itens já modificados em 'root' para consistência)
         List<Map<String, Object>> listaFormatada = new ArrayList<>();
         NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
 
-        for (Map<String, Object> item : itens) {
-            Map<String, Object> estabelecimento = (Map<String, Object>) item.get("estabelecimento");
-            Map<String, Object> mapItem = new HashMap<>();
+        if (itens != null) {
+            for (Map<String, Object> item : itens) {
+                Map<String, Object> estabelecimento = (Map<String, Object>) item.get("estabelecimento");
+                Map<String, Object> mapItem = new HashMap<>();
 
-            Double vlrItem = (Double) item.get("vlrItem");
-            String valorFormatado = formatter.format(vlrItem);  // R$ formatado
-            String texDesc = (String) item.get("texDesc");
+                // trata vlrItem de forma segura (Number ou String)
+                Object vlrObj = item.get("vlrItem");
+                Double vlrItem = null;
+                if (vlrObj instanceof Number) {
+                    vlrItem = ((Number) vlrObj).doubleValue();
+                } else if (vlrObj instanceof String) {
+                    try { vlrItem = Double.parseDouble(((String) vlrObj).replace(",", ".")); }
+                    catch (Exception ignored) {}
+                }
 
-            mapItem.put("vlrItem", valorFormatado);
-            mapItem.put("nomeContrib", estabelecimento.get("nomeContrib"));
-            mapItem.put("nomeLograd", estabelecimento.get("nomeLograd"));
-            mapItem.put("texDesc", texDesc);
+                String valorFormatado = vlrItem == null ? "" : formatter.format(vlrItem);
+                String texDesc = Objects.toString(item.get("texDesc"), "");
 
-            listaFormatada.add(mapItem);
+                mapItem.put("vlrItem", valorFormatado);
+                mapItem.put("nomeContrib", estabelecimento != null ? estabelecimento.get("nomeContrib") : "");
+                mapItem.put("nomeLograd", estabelecimento != null ? estabelecimento.get("nomeLograd") : "");
+                mapItem.put("texDesc", texDesc);
+
+                // produtoPadronizado inserido apenas quando o input era descrição (não GTIN)
+                if (!GtinUtils.isGtin(gtin)) {
+                    mapItem.put("produtoPadronizado", gtin);
+                }
+
+                listaFormatada.add(mapItem);
+            }
         }
 
         String html = Templates.consulta()
-            .data("itens", listaFormatada)
-            .data("token", token)
-            .render();
+                .data("itens", listaFormatada)
+                .data("token", token)
+                .render();
 
         return Response.ok(html).build();
     }
@@ -89,10 +117,10 @@ public class ConsultaResource {
     @Produces(MediaType.TEXT_HTML)
     public Response limpar(@FormParam("token") String accessToken) {
         return Response.ok(
-            ConsultaResource.Templates.consulta()
-                .data("itens", Collections.emptyList())
-                .data("token", accessToken)
-                .render()
+                ConsultaResource.Templates.consulta()
+                        .data("itens", Collections.emptyList())
+                        .data("token", accessToken)
+                        .render()
         ).build();
     }
 }
