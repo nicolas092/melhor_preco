@@ -32,4 +32,16 @@ public interface SefazClient {
             @QueryParam("NroDiaPrz") int nroDiaPrz,
             @HeaderParam("Authorization") String authorization
     );
+
+    @GET
+    @Path("/api/v1/Item/PorDescricao")
+    @Produces(MediaType.APPLICATION_JSON)
+    String consultaItemPorDescricao(
+            @QueryParam("descricao") String gtin,
+            @QueryParam("Longitude") double longitude,
+            @QueryParam("Latitude") double latitude,
+            @QueryParam("NroKmDistancia") int nroKmDistancia,
+            @QueryParam("NroDiaPrz") int nroDiaPrz,
+            @HeaderParam("Authorization") String authorization
+    );
 }
