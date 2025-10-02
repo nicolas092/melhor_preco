@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8"/>
-    <title>Consulta de Preço</title>
+    <title>Consulta</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10,29 +10,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <style>
-        /* Variáveis de Cor para fácil customização */
         :root {
-            --primary-color: #005A9C; /* Um azul mais corporativo */
+            --primary-color: #005A9C;
             --secondary-color: #007BFF;
-            --background-color: #f4f6f9; /* Um cinza bem claro para o fundo */
+            --background-color: #f4f6f9;
             --text-color: #333;
             --header-bg-color: #005A9C;
             --header-text-color: #ffffff;
             --card-bg-color: #ffffff;
             --shadow-color: rgba(0, 0, 0, 0.08);
             --border-color: #dee2e6;
-            --hover-bg-color: #e9f5ff; /* Azul bem claro para o hover */
+            --hover-bg-color: #e9f5ff;
         }
-
-        /* Estilos Globais e Tipografia */
         body {
             background-color: var(--background-color);
             font-family: 'Poppins', sans-serif;
             color: var(--text-color);
             font-size: 0.95rem;
         }
-
-        /* Layout Principal */
         .main-container {
             background-color: var(--card-bg-color);
             border-radius: 12px;
@@ -40,8 +35,6 @@
             padding: 2rem;
             margin-top: 1.5rem;
         }
-
-        /* Cabeçalho da Página */
         .page-title {
             color: var(--primary-color);
             font-weight: 600;
@@ -49,8 +42,6 @@
             align-items: center;
             gap: 0.75rem;
         }
-
-        /* Painel de Controles (Formulários) */
         .controls-panel {
             background-color: #fcfdff;
             border: 1px solid #e9ecef;
@@ -58,8 +49,6 @@
             padding: 1.5rem;
             margin-bottom: 2rem;
         }
-
-        /* Botões e Inputs */
         .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
@@ -75,8 +64,6 @@
             border-color: var(--primary-color);
             box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25);
         }
-
-        /* Estilos da Tabela */
         .table-responsive { max-height: 70vh; border-radius: 8px; }
         .table thead { position: sticky; top: 0; z-index: 20; }
         .table thead th {
@@ -93,35 +80,20 @@
             padding: 0.8rem 0.75rem;
             vertical-align: middle;
         }
-        .table-hover > tbody > tr:hover {
-            background-color: var(--hover-bg-color);
-        }
-
-        /* Estilos das Setas de Ordenação */
+        .table-hover > tbody > tr:hover { background-color: var(--hover-bg-color); }
         .table thead th.sortable::after {
-            font-family: "bootstrap-icons";
-            opacity: 0.5; /* Um pouco mais visível */
-            position: absolute; right: 0.75rem; top: 50%;
-            transform: translateY(-50%); content: "\f533";
-            transition: opacity 0.2s;
+            font-family: "bootstrap-icons"; opacity: 0.5; position: absolute; right: 0.75rem; top: 50%;
+            transform: translateY(-50%); content: "\f533"; transition: opacity 0.2s;
         }
         .table thead th:hover::after { opacity: 1; }
         .table thead th.sorted-asc::after { opacity: 1; content: "\f148"; }
         .table thead th.sorted-desc::after { opacity: 1; content: "\f128"; }
-
-        /* Estilos da Coluna Fixa */
-        thead th:first-child {
-            position: sticky; left: 0; z-index: 10;
-        }
+        thead th:first-child { position: sticky; left: 0; z-index: 10; }
         tbody td:first-child {
-            position: sticky; left: 0; z-index: 5;
-            background-color: var(--card-bg-color);
-            /* Cor de fundo no hover para a coluna fixa */
+            position: sticky; left: 0; z-index: 5; background-color: var(--card-bg-color);
             transition: background-color 0.1s linear;
         }
-        tbody tr:hover td:first-child {
-            background-color: var(--hover-bg-color);
-        }
+        tbody tr:hover td:first-child { background-color: var(--hover-bg-color); }
     </style>
 </head>
 <body class="p-3">
@@ -132,7 +104,7 @@
 
         <div class="controls-panel">
             <div class="row g-3 align-items-end">
-                <div class="col-md-auto">
+                <div class="col-lg-auto col-md-12">
                     <form method="post" action="/dia" class="d-flex g-2">
                         <div>
                             <label for="diaInput" class="form-label fw-bold">Selecione o Dia</label>
@@ -143,9 +115,13 @@
                         </div>
                     </form>
                 </div>
-                <div class="col-md-5 ms-md-auto">
-                    <label for="searchInput" class="form-label fw-bold">Filtrar resultados na tela</label>
-                    <input type="text" id="searchInput" class="form-control" placeholder="Digite a descrição do produto...">
+                <div class="col-lg col-md-6">
+                    <label for="rowSearchInput" class="form-label fw-bold">Filtrar por Produto</label>
+                    <input type="text" id="rowSearchInput" class="form-control" placeholder="Digite a descrição...">
+                </div>
+                <div class="col-lg col-md-6">
+                    <label for="columnSearchInput" class="form-label fw-bold">Filtrar por Mercado/Coluna</label>
+                    <input type="text" id="columnSearchInput" class="form-control" placeholder="Digite o nome do mercado...">
                 </div>
             </div>
         </div>
@@ -189,13 +165,17 @@
     document.addEventListener('DOMContentLoaded', () => {
         const table = document.getElementById('dataTable');
         if (!table) return;
-        const searchInput = document.getElementById('searchInput');
+
+        const rowSearchInput = document.getElementById('rowSearchInput');
+        const columnSearchInput = document.getElementById('columnSearchInput'); // NOVO
         const tableBody = document.getElementById('tableBody');
         const tableRows = tableBody.getElementsByTagName('tr');
         const noResultsMessage = document.getElementById('noResultsMessage');
         const headers = table.querySelectorAll('thead th');
-        searchInput.addEventListener('input', () => {
-            const searchTerm = searchInput.value.toLowerCase();
+
+        // --- FILTRO DE LINHAS (PRODUTOS) ---
+        rowSearchInput.addEventListener('input', () => {
+            const searchTerm = rowSearchInput.value.toLowerCase();
             let visibleRows = 0;
             for (const row of tableRows) {
                 const descriptionCell = row.cells[0].textContent.toLowerCase();
@@ -206,8 +186,33 @@
                     row.style.display = 'none';
                 }
             }
-            noResultsMessage.style.display = visibleRows === 0 ? 'block' : 'none';
+            noResultsMessage.style.display = visibleRows > 0 ? 'none' : 'block';
         });
+
+        // --- NOVO: FILTRO DE COLUNAS (MERCADOS) ---
+        columnSearchInput.addEventListener('input', () => {
+            const searchTerm = columnSearchInput.value.toLowerCase();
+
+            // Itera por todas as colunas, começando da segunda (índice 1)
+            // A coluna "Descrição" (índice 0) nunca é escondida
+            for (let i = 1; i < headers.length; i++) {
+                const header = headers[i];
+                const headerText = header.textContent.toLowerCase();
+                const shouldShow = headerText.includes(searchTerm);
+
+                // Mostra ou esconde o cabeçalho da coluna
+                header.style.display = shouldShow ? '' : 'none';
+
+                // Itera por todas as linhas para mostrar/esconder a célula correspondente
+                for (const row of tableRows) {
+                    if (row.cells[i]) {
+                        row.cells[i].style.display = shouldShow ? '' : 'none';
+                    }
+                }
+            }
+        });
+
+        // --- ORDENAÇÃO DA TABELA ---
         headers.forEach((header, columnIndex) => {
             header.classList.add('sortable');
             header.addEventListener('click', () => {
