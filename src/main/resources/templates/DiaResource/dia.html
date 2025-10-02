@@ -121,7 +121,7 @@
                 </div>
                 <div class="col-lg col-md-6">
                     <label for="columnSearchInput" class="form-label fw-bold">Filtrar por Mercado/Coluna</label>
-                    <input type="text" id="columnSearchInput" class="form-control" placeholder="Digite o nome do mercado...">
+                    <input type="text" id="columnSearchInput" class="form-control" placeholder="Use vírgula para comparar (ex: loja1, loja2)">
                 </div>
             </div>
         </div>
@@ -162,57 +162,88 @@
 </div>
 
 <script>
+    // Função Debounce para otimizar a execução do filtro
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         const table = document.getElementById('dataTable');
         if (!table) return;
 
         const rowSearchInput = document.getElementById('rowSearchInput');
-        const columnSearchInput = document.getElementById('columnSearchInput'); // NOVO
+        const columnSearchInput = document.getElementById('columnSearchInput');
         const tableBody = document.getElementById('tableBody');
-        const tableRows = tableBody.getElementsByTagName('tr');
+        const tableRows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
         const noResultsMessage = document.getElementById('noResultsMessage');
         const headers = table.querySelectorAll('thead th');
 
-        // --- FILTRO DE LINHAS (PRODUTOS) ---
-        rowSearchInput.addEventListener('input', () => {
-            const searchTerm = rowSearchInput.value.toLowerCase();
+        // ===================================================================================
+        // FUNÇÃO CENTRALIZADA DE FILTROS
+        // ===================================================================================
+        const updateTableVisibility = () => {
+            // 1. FILTRO DE COLUNAS (Executado primeiro)
+            const columnSearchString = columnSearchInput.value.toLowerCase();
+            const columnSearchTerms = columnSearchString.split(',')
+                .map(term => term.trim())
+                .filter(term => term.length > 0);
+
+            for (let i = 1; i < headers.length; i++) {
+                const header = headers[i];
+                const headerText = header.textContent.toLowerCase();
+                const shouldShowColumn = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
+
+                header.style.display = shouldShowColumn ? '' : 'none';
+                for (const row of tableRows) {
+                    if (row.cells[i]) {
+                        row.cells[i].style.display = shouldShowColumn ? '' : 'none';
+                    }
+                }
+            }
+
+            // 2. FILTRO DE LINHAS (Executado depois, considerando as colunas visíveis)
+            const productSearchTerm = rowSearchInput.value.toLowerCase();
             let visibleRows = 0;
+
             for (const row of tableRows) {
-                const descriptionCell = row.cells[0].textContent.toLowerCase();
-                if (descriptionCell.includes(searchTerm)) {
+                // Condição 1: A linha corresponde ao filtro de produto?
+                const matchesProductFilter = row.cells[0].textContent.toLowerCase().includes(productSearchTerm);
+
+                // Condição 2: A linha tem algum preço VISÍVEL?
+                let hasVisiblePrice = false;
+                for (let i = 1; i < row.cells.length; i++) {
+                    // Verifica se a célula tem conteúdo E se não está escondida pelo filtro de colunas
+                    if (row.cells[i].textContent.trim() !== '' && row.cells[i].style.display !== 'none') {
+                        hasVisiblePrice = true;
+                        break; // Encontrou um preço, pode parar de procurar nesta linha
+                    }
+                }
+
+                // A linha só aparece se ambas as condições forem verdadeiras
+                if (matchesProductFilter && hasVisiblePrice) {
                     row.style.display = '';
                     visibleRows++;
                 } else {
                     row.style.display = 'none';
                 }
             }
+
             noResultsMessage.style.display = visibleRows > 0 ? 'none' : 'block';
-        });
+        };
+        // ===================================================================================
+        // FIM DA FUNÇÃO
+        // ===================================================================================
 
-        // --- NOVO: FILTRO DE COLUNAS (MERCADOS) ---
-        columnSearchInput.addEventListener('input', () => {
-            const searchTerm = columnSearchInput.value.toLowerCase();
+        // Aplica a função centralizada com debounce para ambos os inputs
+        rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
+        columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
 
-            // Itera por todas as colunas, começando da segunda (índice 1)
-            // A coluna "Descrição" (índice 0) nunca é escondida
-            for (let i = 1; i < headers.length; i++) {
-                const header = headers[i];
-                const headerText = header.textContent.toLowerCase();
-                const shouldShow = headerText.includes(searchTerm);
 
-                // Mostra ou esconde o cabeçalho da coluna
-                header.style.display = shouldShow ? '' : 'none';
-
-                // Itera por todas as linhas para mostrar/esconder a célula correspondente
-                for (const row of tableRows) {
-                    if (row.cells[i]) {
-                        row.cells[i].style.display = shouldShow ? '' : 'none';
-                    }
-                }
-            }
-        });
-
-        // --- ORDENAÇÃO DA TABELA ---
+        // --- ORDENAÇÃO DA TABELA (sem alterações) ---
         headers.forEach((header, columnIndex) => {
             header.classList.add('sortable');
             header.addEventListener('click', () => {
