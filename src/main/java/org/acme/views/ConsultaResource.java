@@ -6,8 +6,8 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-
 import org.acme.externo.SefazClient;
+import org.acme.utils.GtinUtils;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,7 +42,10 @@ public class ConsultaResource {
         @FormParam("nroDiaPrz") int nroDiaPrz
     ) throws Exception {
         String authHeader = "Bearer " + token;
-        String jsonResponse = sefazClient.consultaItem(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader);
+
+        String jsonResponse = GtinUtils.isGtin(gtin)?
+                sefazClient.consultaItem(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader) : //se gtin
+                sefazClient.consultaItemPorDescricao(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader); // se nao
 
         Map<String, Object> resposta = objectMapper.readValue(jsonResponse, Map.class);
         List<Map<String, Object>> itens = (List<Map<String, Object>>) resposta.get("itens");
