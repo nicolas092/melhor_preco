@@ -12,7 +12,12 @@ import org.acme.utils.JsonRepository;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jboss.resteasy.reactive.MultipartForm;
+import org.jboss.resteasy.reactive.PartType;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.text.NumberFormat;
 import java.util.*;
 
@@ -46,7 +51,7 @@ public class ConsultaResource {
     ) throws Exception {
         String authHeader = "Bearer " + token;
 
-        String jsonResponse = GtinUtils.isGtin(gtin)?
+        String jsonResponse = GtinUtils.isGtin(gtin) ?
                 sefazClient.consultaItem(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader) : //se gtin
                 sefazClient.consultaItemPorDescricao(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader); // se nao
 
@@ -82,8 +87,10 @@ public class ConsultaResource {
                 if (vlrObj instanceof Number) {
                     vlrItem = ((Number) vlrObj).doubleValue();
                 } else if (vlrObj instanceof String) {
-                    try { vlrItem = Double.parseDouble(((String) vlrObj).replace(",", ".")); }
-                    catch (Exception ignored) {}
+                    try {
+                        vlrItem = Double.parseDouble(((String) vlrObj).replace(",", "."));
+                    } catch (Exception ignored) {
+                    }
                 }
 
                 String valorFormatado = vlrItem == null ? "" : formatter.format(vlrItem);
@@ -123,4 +130,40 @@ public class ConsultaResource {
                         .render()
         ).build();
     }
+
+    @POST
+    @Path("/upload")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.TEXT_HTML)
+    public Response uploadTxt(@MultipartForm TxtUploadForm form,
+                              @FormParam("token") String token,
+                              @FormParam("longitude") double longitude,
+                              @FormParam("latitude") double latitude,
+                              @FormParam("nroKmDistancia") int nroKmDistancia,
+                              @FormParam("nroDiaPrz") int nroDiaPrz) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(form.file))) {
+            String linha;
+            List<Response> respostas = new ArrayList<>();
+
+            while ((linha = reader.readLine()) != null) {
+                String gtin = linha.trim();
+                if (gtin.isEmpty()) continue;
+
+                // reaproveita seu método já existente
+                Response resp = receber(token, gtin, longitude, latitude, nroKmDistancia, nroDiaPrz);
+                respostas.add(resp);
+            }
+
+            return Response.ok("Processados " + respostas.size() + " GTINs do arquivo.").build();
+        } catch (Exception e) {
+            return Response.serverError().entity("Erro ao processar arquivo: " + e.getMessage()).build();
+        }
+    }
+
+    public static class TxtUploadForm {
+        @FormParam("file")
+        @PartType(MediaType.TEXT_PLAIN)
+        public InputStream file;
+    }
 }
+
