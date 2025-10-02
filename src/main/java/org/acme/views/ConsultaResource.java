@@ -1,5 +1,6 @@
 package org.acme.views;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.qute.CheckedTemplate;
 import io.quarkus.qute.TemplateInstance;
 import jakarta.inject.Inject;
@@ -10,14 +11,13 @@ import org.acme.externo.SefazClient;
 import org.acme.utils.GtinUtils;
 import org.acme.utils.JsonRepository;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jboss.resteasy.reactive.MultipartForm;
 import org.jboss.resteasy.reactive.PartType;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.text.NumberFormat;
 import java.util.*;
 
@@ -31,13 +31,14 @@ public class ConsultaResource {
     SefazClient sefazClient;
 
     @Inject
-    ObjectMapper objectMapper;  // Para JSON
+    ObjectMapper objectMapper;
 
     @CheckedTemplate(requireTypeSafeExpressions = false)
     public static class Templates {
-        public static native TemplateInstance consulta();  // Sem parâmetro aqui
+        public static native TemplateInstance consulta();
     }
 
+    // O método receber() não foi alterado
     @POST
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_HTML)
@@ -52,27 +53,22 @@ public class ConsultaResource {
         String authHeader = "Bearer " + token;
 
         String jsonResponse = GtinUtils.isGtin(gtin) ?
-                sefazClient.consultaItem(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader) : //se gtin
-                sefazClient.consultaItemPorDescricao(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader); // se nao
+                sefazClient.consultaItem(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader) :
+                sefazClient.consultaItemPorDescricao(gtin, longitude, latitude, nroKmDistancia, nroDiaPrz, authHeader);
 
-        // parse pra poder injetar produtoPadronizado (somente se não for GTIN)
         Map<String, Object> root = objectMapper.readValue(jsonResponse, Map.class);
         List<Map<String, Object>> itens = (List<Map<String, Object>>) root.get("itens");
 
         if (!GtinUtils.isGtin(gtin) && itens != null) {
             for (Map<String, Object> item : itens) {
-                // sobrescreve/insere produtoPadronizado com o input (descrição)
                 item.put("produtoPadronizado", gtin);
             }
-            // reserializa e salva o JSON modificado
             String modifiedJson = objectMapper.writeValueAsString(root);
             repo.salvarJson(modifiedJson);
         } else {
-            // se for GTIN ou não há itens, salva response original
             repo.salvarJson(jsonResponse);
         }
 
-        // monta listaFormatada para exibir na view (usa os itens já modificados em 'root' para consistência)
         List<Map<String, Object>> listaFormatada = new ArrayList<>();
         NumberFormat formatter = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
 
@@ -81,7 +77,6 @@ public class ConsultaResource {
                 Map<String, Object> estabelecimento = (Map<String, Object>) item.get("estabelecimento");
                 Map<String, Object> mapItem = new HashMap<>();
 
-                // trata vlrItem de forma segura (Number ou String)
                 Object vlrObj = item.get("vlrItem");
                 Double vlrItem = null;
                 if (vlrObj instanceof Number) {
@@ -89,8 +84,7 @@ public class ConsultaResource {
                 } else if (vlrObj instanceof String) {
                     try {
                         vlrItem = Double.parseDouble(((String) vlrObj).replace(",", "."));
-                    } catch (Exception ignored) {
-                    }
+                    } catch (Exception ignored) {}
                 }
 
                 String valorFormatado = vlrItem == null ? "" : formatter.format(vlrItem);
@@ -101,7 +95,6 @@ public class ConsultaResource {
                 mapItem.put("nomeLograd", estabelecimento != null ? estabelecimento.get("nomeLograd") : "");
                 mapItem.put("texDesc", texDesc);
 
-                // produtoPadronizado inserido apenas quando o input era descrição (não GTIN)
                 if (!GtinUtils.isGtin(gtin)) {
                     mapItem.put("produtoPadronizado", gtin);
                 }
@@ -118,6 +111,7 @@ public class ConsultaResource {
         return Response.ok(html).build();
     }
 
+    // O método limpar() não foi alterado
     @POST
     @Path("/limpar")
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
@@ -131,6 +125,9 @@ public class ConsultaResource {
         ).build();
     }
 
+    // ===================================================================================
+    // MÉTODO UPLOADTXT AJUSTADO PARA O TEMPO CURTO (MILISSEGUNDOS)
+    // ===================================================================================
     @POST
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -140,21 +137,26 @@ public class ConsultaResource {
                               @FormParam("longitude") double longitude,
                               @FormParam("latitude") double latitude,
                               @FormParam("nroKmDistancia") int nroKmDistancia,
-                              @FormParam("nroDiaPrz") int nroDiaPrz) {
+                              @FormParam("nroDiaPrz") int nroDiaPrz) throws Exception {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(form.file))) {
             String linha;
-            List<Response> respostas = new ArrayList<>();
+            Random random = new Random();
 
             while ((linha = reader.readLine()) != null) {
                 String gtin = linha.trim();
                 if (gtin.isEmpty()) continue;
 
-                // reaproveita seu método já existente
-                Response resp = receber(token, gtin, longitude, latitude, nroKmDistancia, nroDiaPrz);
-                respostas.add(resp);
+                // 1. Processa uma linha do arquivo
+                receber(token, gtin, longitude, latitude, nroKmDistancia, nroDiaPrz);
+
+                // 2. Pausa por um tempo aleatório entre 300 e 600 MILISSEGUNDOS
+                int delayInMillis = 300 + random.nextInt(301); // Gera de 0-300, soma 300 -> range 300-600
+                Thread.sleep(delayInMillis);
             }
 
-            return Response.ok("Processados " + respostas.size() + " GTINs do arquivo.").build();
+            // 3. Após o loop terminar, redireciona o usuário para a página /dia
+            return Response.seeOther(new URI("/dia")).build();
+
         } catch (Exception e) {
             return Response.serverError().entity("Erro ao processar arquivo: " + e.getMessage()).build();
         }
@@ -166,4 +168,3 @@ public class ConsultaResource {
         public InputStream file;
     }
 }
-

@@ -2,11 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8" />
-    <title>Consulta de Preço Comparativa</title>
+    <title>Consulta de Preço</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
-    <link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.3.0/css/fixedColumns.dataTables.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,47 +21,116 @@
         .main-container {
             background-color: var(--card-bg-color); border-radius: 12px;
             box-shadow: 0 4px 20px var(--shadow-color); padding: 2rem;
-            margin-top: 1.5rem; width: 100%; max-width: 95%;
+            margin: 2rem 0; width: 100%; max-width: 1200px;
         }
-        .page-title { color: var(--primary-color); font-weight: 600; display: flex; align-items: center; gap: 0.75rem; }
-        .controls-panel { background-color: #fcfdff; border: 1px solid #e9ecef; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+        .page-title { color: var(--primary-color); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
         .btn-success { background-color: var(--success-color); border-color: var(--success-color); font-weight: 500; transition: all 0.2s ease-in-out; }
         .btn-success:hover, .btn-secondary:hover { transform: translateY(-2px); }
         .form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25); }
 
         /* Estilos para DataTables */
-        .dataTables_wrapper .dataTables_length select, .dataTables_wrapper .dataTables_filter input {
+        .dataTables_wrapper .dataTables_length select,
+        .dataTables_wrapper .dataTables_filter input,
+        tfoot input {
             border-radius: 0.375rem; border: 1px solid var(--border-color); padding: 0.375rem 0.75rem;
+            transition: all 0.2s ease-in-out;
+        }
+        .dataTables_wrapper .dataTables_filter input:focus,
+        tfoot input:focus {
+             border-color: var(--primary-color);
+             box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25);
+             outline: none;
         }
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: var(--primary-color) !important; border-color: var(--primary-color) !important; color: white !important;
+            background: var(--primary-color) !important; border-color: var(--primary-color) !important;
+            color: white !important; border-radius: 50% !important;
         }
-        #comparisonTable thead { background-color: #f8f9fa; }
+        .dataTables_wrapper .dataTables_paginate .paginate_button { border-radius: 50% !important; margin: 0 2px; }
+        #minhaTabela thead, #minhaTabela tfoot { background-color: #f0f2f5; }
+        tfoot input { width: 100%; }
+
+        /* Estilo para o painel de upload */
+        .upload-panel {
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            background-color: #fcfdff;
+        }
+
+        /* NOVO: Estilos para a tela de Loading */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1056; /* Acima de outros componentes Bootstrap */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.2rem;
+        }
     </style>
 </head>
-<body class="bg-light d-flex flex-column align-items-center pt-5">
-<div class="main-container">
-    <h3 class="page-title text-center mb-4"><i class="bi bi-bar-chart-line-fill"></i> Consulta de Preço Comparativa</h3>
+<body class="d-flex flex-column align-items-center">
 
-    <div class="controls-panel">
-        <form id="formConsulta" action="/consulta" method="post">
-            <input type="hidden" name="token" value="{token}" />
-            <div class="row">
-                <div class="col-md-6 mb-3"><label for="gtin" class="form-label fw-bold">GTIN/Descrição</label><input type="text" class="form-control" id="gtin" name="gtin" value="8410221110150" required /></div>
-                <div class="col-md-6 mb-3"><label for="longitude" class="form-label fw-bold">Longitude</label><input type="number" step="any" class="form-control" id="longitude" name="longitude" required /></div>
-                <div class="col-md-6 mb-3"><label for="latitude" class="form-label fw-bold">Latitude</label><input type="number" step="any" class="form-control" id="latitude" name="latitude" required /></div>
-                <div class="col-md-6 mb-3"><label for="nroKmDistancia" class="form-label fw-bold">Raio de Distância (Km)</label><input type="number" class="form-control" id="nroKmDistancia" name="nroKmDistancia" value="10" required /></div>
-                <div class="col-md-6 mb-3"><label for="nroDiaPrz" class="form-label fw-bold">Prazo (Dias)</label><input type="number" class="form-control" id="nroDiaPrz" name="nroDiaPrz" value="3" required /></div>
-            </div>
-            <div class="d-flex gap-2 mt-2">
-                <button type="submit" class="btn btn-success w-100 py-2"><i class="bi bi-send-fill me-2"></i>Consultar</button>
-                <button type="button" id="btnLimpar" class="btn btn-secondary w-100 py-2"><i class="bi bi-eraser-fill me-2"></i>Limpar</button>
+<div id="loading-overlay" style="display: none;">
+    <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3">Processando arquivo, por favor aguarde...</p>
+</div>
+
+
+<div class="main-container">
+    <h3 class="page-title text-center mb-4"><i class="bi bi-search"></i> Consulta de Preço</h3>
+
+    <form id="formConsulta" action="/consulta" method="post" class="mb-5">
+        <input type="hidden" name="token" id="mainToken" value="{token}" />
+        <div class="row">
+            <div class="col-md-6 mb-3"><label for="gtin" class="form-label fw-bold">GTIN/Descrição</label><input type="text" class="form-control" id="gtin" name="gtin" value="8410221110150" required /></div>
+            <div class="col-md-6 mb-3"><label for="longitude" class="form-label fw-bold">Longitude</label><input type="number" step="any" class="form-control" id="longitude" name="longitude" required /></div>
+            <div class="col-md-6 mb-3"><label for="latitude" class="form-label fw-bold">Latitude</label><input type="number" step="any" class="form-control" id="latitude" name="latitude" required /></div>
+            <div class="col-md-6 mb-3"><label for="nroKmDistancia" class="form-label fw-bold">Raio de Distância (Km)</label><input type="number" class="form-control" id="nroKmDistancia" name="nroKmDistancia" value="10" required /></div>
+            <div class="col-md-6 mb-3"><label for="nroDiaPrz" class="form-label fw-bold">Prazo (Dias)</label><input type="number" class="form-control" id="nroDiaPrz" name="nroDiaPrz" value="3" required /></div>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn btn-success w-100 py-2"><i class="bi bi-send-fill me-2"></i>Consultar</button>
+            <button type="button" id="btnLimpar" class="btn btn-secondary w-100 py-2"><i class="bi bi-eraser-fill me-2"></i>Limpar</button>
+        </div>
+    </form>
+
+    <div class="upload-panel mb-5">
+        <h5 class="text-muted fw-bold mb-3"><i class="bi bi-file-earmark-arrow-up-fill"></i> Consulta em Lote</h5>
+        <form id="formUpload" action="/consulta/upload" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="token" id="uploadToken" />
+            <input type="hidden" name="longitude" id="uploadLongitude" />
+            <input type="hidden" name="latitude" id="uploadLatitude" />
+            <input type="hidden" name="nroKmDistancia" id="uploadKmDistancia" />
+            <input type="hidden" name="nroDiaPrz" id="uploadDiaPrz" />
+
+            <div class="row align-items-end">
+                <div class="col-md-8 mb-3 mb-md-0">
+                    <label for="fileUpload" class="form-label">Arquivo de GTINs (.txt)</label>
+                    <input class="form-control" type="file" id="fileUpload" name="file" accept=".txt" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-outline-primary w-100"><i class="bi bi-gear-fill me-2"></i>Processar Arquivo</button>
+                </div>
             </div>
         </form>
     </div>
 
-    <div style="display: none;">
-        <table id="sourceTable">
+    {#if !itens.isEmpty()}
+    <hr>
+    <div class="table-responsive mb-4">
+        <table id="minhaTabela" class="display table table-striped w-100">
+            <thead>
+            <tr><th>Descrição</th><th>Loja</th><th>Endereço</th><th>Preço</th></tr>
+            </thead>
             <tbody>
             {#for item in itens}
             <tr>
@@ -73,11 +141,10 @@
             </tr>
             {/for}
             </tbody>
+            <tfoot>
+            <tr><th>Descrição</th><th>Loja</th><th>Endereço</th><th>Preço</th></tr>
+            </tfoot>
         </table>
-    </div>
-
-    {#if !itens.isEmpty()}
-    <div id="comparisonTableContainer">
     </div>
     {/if}
 
@@ -85,92 +152,82 @@
     <div class="alert alert-info text-center">Nenhum resultado para exibir. Por favor, realize uma consulta.</div>
     {/if}
 
-
-    <p class="text-center mt-4 text-muted" style="font-size: 0.9rem;">Sistema Interno de Busca de Preços</p>
+    <p class="text-center mt-4 text-muted" style="font-size: 0.9rem;">
+        Sistema Interno de Busca de Preços
+    </p>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/fixedcolumns/4.3.0/js/dataTables.fixedColumns.min.js"></script>
 
 <script>
     $(document).ready(function () {
-        // Se a tabela de fonte de dados não tiver linhas, não faz nada
-        if ($('#sourceTable tbody tr').length === 0) {
-            return;
-        }
-
-        // 1. Extrair os dados da tabela escondida
-        let rawData = [];
-        $('#sourceTable tbody tr').each(function() {
-            const row = $(this).find('td');
-            rawData.push({
-                descricao: row.eq(0).text(),
-                loja: row.eq(1).text(),
-                preco: row.eq(3).text()
-            });
-        });
-
-        // 2. Processar os dados para o formato de comparação
-        var products = {};
-        var allStores = new Set();
-        rawData.forEach(function(item) {
-            if (!products[item.descricao]) {
-                products[item.descricao] = {};
-            }
-            products[item.descricao][item.loja] = item.preco;
-            allStores.add(item.loja);
-        });
-
-        // 3. FILTRAR: Manter apenas as colunas (lojas) que têm pelo menos um preço
-        var storesWithData = new Set();
-        Object.values(products).forEach(function(storePrices) {
-            Object.keys(storePrices).forEach(function(storeName) {
-                storesWithData.add(storeName);
-            });
-        });
-        var finalStoreList = Array.from(storesWithData).sort();
-
-        // 4. Construir o HTML da tabela final APENAS com as colunas que têm dados
-        var tableHtml = '<div class="alert alert-info"><i class="bi bi-info-circle-fill"></i> Apenas lojas com preços para os produtos consultados são exibidas. Rolagem horizontal pode ser necessária.</div>' +
-            '<div class="table-responsive mb-4"><table id="comparisonTable" class="display table table-striped w-100"><thead><tr><th>Descrição</th>';
-        finalStoreList.forEach(function(store) {
-            tableHtml += '<th>' + store + '</th>';
-        });
-        tableHtml += '</tr></thead><tbody>';
-        var productNames = Object.keys(products).sort();
-        productNames.forEach(function(productName) {
-            tableHtml += '<tr><td>' + productName + '</td>';
-            finalStoreList.forEach(function(store) {
-                var price = products[productName][store] || '';
-                tableHtml += '<td>' + price + '</td>';
-            });
-            tableHtml += '</tr>';
-        });
-        tableHtml += '</tbody></table></div>';
-
-        // 5. Inserir a tabela no container e inicializar o DataTables
-        $('#comparisonTableContainer').html(tableHtml);
-
-        var comparisonTableApi = $('#comparisonTable').DataTable({
-            scrollX: true,
-            fixedColumns: { left: 1 },
-            pageLength: 50,
-            language: { url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json" }
-        });
-
-        // --- Lógica dos Botões e Formulário ---
+        // --- Lógica do Botão Limpar ---
         $('#btnLimpar').click(function () {
-            const token = $('input[name="token"]').val();
+            const token = $('#mainToken').val();
             const form = $('<form>', { method: 'POST', action: '/consulta/limpar' });
             form.append($('<input>', { type: 'hidden', name: 'token', value: token }));
             $('body').append(form);
             form.submit();
         });
+
+        // --- Lógica para o formulário de Upload ---
+        $('#formUpload').on('submit', function(event) {
+            // Previne o envio imediato para podermos mostrar o loading
+            event.preventDefault();
+
+            // Mostra a tela de loading
+            $('#loading-overlay').show();
+
+            // Copia os valores do formulário principal para os campos ocultos do upload
+            $('#uploadToken').val($('#mainToken').val());
+            $('#uploadLongitude').val($('#longitude').val());
+            $('#uploadLatitude').val($('#latitude').val());
+            $('#uploadKmDistancia').val($('#nroKmDistancia').val());
+            $('#uploadDiaPrz').val($('#nroDiaPrz').val());
+
+            // Envia o formulário
+            this.submit();
+        });
+
+        // Se a tabela não existir, não faz mais nada
+        if ($('#minhaTabela').length === 0) {
+            return;
+        }
+
+        // --- LÓGICA DA TABELA OTIMIZADA ---
+        $.fn.dataTable.ext.type.order['brazilian-currency-pre'] = function (d) {
+            d = d.replace(/R\$\s?/, '').replace(/\./g, '').replace(/,/, '.');
+            return parseFloat(d) || 0;
+        };
+
+        $('#minhaTabela tfoot th').each(function () {
+            var title = $(this).text();
+            $(this).html('<input type="text" placeholder="Buscar ' + title + '..." />');
+        });
+
+        var table = $('#minhaTabela').DataTable({
+            order: [[3, 'asc']],
+            pageLength: 25,
+            language: { url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json" },
+            columnDefs: [{ type: 'brazilian-currency', targets: 3 }],
+            initComplete: function () {
+                this.api().columns().every(function () {
+                    var that = this;
+                    $('input', this.footer()).on('keyup change clear', function () {
+                        if (that.search() !== this.value) {
+                            that.search(this.value).draw();
+                        }
+                    });
+                });
+            }
+        });
     });
 
-    // Gerar latitude e longitude (sem alterações)
-    function gerarVariacao(base, variacao) { return (base + (Math.random() * 2 - 1) * variacao).toFixed(7); }
+    // Gerar latitude e longitude
+    function gerarVariacao(base, variacao) {
+        return (base + (Math.random() * 2 - 1) * variacao).toFixed(7);
+    }
     document.addEventListener('DOMContentLoaded', function () {
         if (!document.getElementById('latitude').value) {
              document.getElementById('latitude').value = gerarVariacao(-30.0666644, 0.0004);
