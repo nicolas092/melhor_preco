@@ -150,7 +150,7 @@ public class ConsultaResource {
                 receber(token, gtin, longitude, latitude, nroKmDistancia, nroDiaPrz);
 
                 // 2. Pausa por um tempo aleatório entre 300 e 600 MILISSEGUNDOS
-                int delayInMillis = 300 + random.nextInt(301); // Gera de 0-300, soma 300 -> range 300-600
+                int delayInMillis = 500 + random.nextInt(401); // Gera de 0-300, soma 300 -> range 300-600
                 Thread.sleep(delayInMillis);
             }
 
