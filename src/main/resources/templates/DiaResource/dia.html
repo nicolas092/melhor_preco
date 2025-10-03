@@ -64,9 +64,7 @@
             border-color: var(--primary-color);
             box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25);
         }
-
-        /* Tabela: responsivo e legível */
-        .table-responsive { max-height: 70vh; border-radius: 8px; overflow: auto; }
+        .table-responsive { max-height: 70vh; border-radius: 8px; }
         .table thead { position: sticky; top: 0; z-index: 20; }
         .table thead th {
             background: var(--header-bg-color);
@@ -79,9 +77,8 @@
             padding: 0.9rem 0.75rem;
         }
         .table tbody td {
-            padding: 0.6rem 0.75rem;
+            padding: 0.8rem 0.75rem;
             vertical-align: middle;
-            border-top: 1px solid var(--border-color);
         }
         .table-hover > tbody > tr:hover { background-color: var(--hover-bg-color); }
         .table thead th.sortable::after {
@@ -91,60 +88,22 @@
         .table thead th:hover::after { opacity: 1; }
         .table thead th.sorted-asc::after { opacity: 1; content: "\f148"; }
         .table thead th.sorted-desc::after { opacity: 1; content: "\f128"; }
-
-        /* sticky primeiro coluna (descrição) */
         thead th:first-child { position: sticky; left: 0; z-index: 10; }
         tbody td:first-child {
             position: sticky; left: 0; z-index: 5; background-color: var(--card-bg-color);
             transition: background-color 0.1s linear;
         }
         tbody tr:hover td:first-child { background-color: var(--hover-bg-color); }
-
-        /* descrição com ellipsis e tooltip */
-        td.description {
-            max-width: 520px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        td.description .meta {
-            display: inline-block;
-            margin-left: 0.5rem;
-            vertical-align: middle;
-        }
-
-        /* preços alinhados à direita e largura mínima */
-        td.price {
-            text-align: right;
-            white-space: nowrap;
-            min-width: 110px;
-            font-feature-settings: "tnum";
-        }
-        /* destaque do menor preço na linha */
-        td.price-lowest {
-            background: #e9f9ef;
-            font-weight: 700;
-            border-left: 4px solid #28a745;
-        }
-        /* placeholder para células vazias (caso backend não envie '-') */
-        td.price:empty::after { content: "-"; color: #6c757d; }
-
-        /* badges pequenos (GTIN / count) */
-        .badge-gtin { font-size: 0.65rem; padding: 0.25rem 0.35rem; }
-        .badge-count { font-size: 0.65rem; padding: 0.25rem 0.35rem; margin-left: 0.3rem; }
-
-        /* small responsiveness on very narrow screens */
-        @media (max-width: 900px) {
-            td.description { max-width: 280px; }
-            td.price { min-width: 95px; font-size: 0.92rem; }
-        }
     </style>
 </head>
 <body class="p-3">
 <div class="container-fluid">
     <div class="main-container">
 
-        <h3 class="page-title mb-4"><i class="bi bi-calendar-check"></i> Consulta de Preços</h3>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="page-title mb-0"><i class="bi bi-calendar-check"></i> Consulta de Preços</h3>
+            <a href="javascript:history.back()" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
+        </div>
 
         <div class="controls-panel">
             <div class="row g-3 align-items-end">
@@ -155,7 +114,7 @@
                             <input type="date" name="dia" id="diaInput" class="form-control" value="{dia}" />
                         </div>
                         <div class="align-self-end ms-2">
-                            <button class="btn btn-primary px-4"><i class="bi bi-search me-1"></i>Buscar</button>
+                            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-search me-1"></i>Buscar</button>
                         </div>
                     </form>
                 </div>
@@ -171,51 +130,40 @@
         </div>
 
         {#if cols.isEmpty()}
-            <div class="alert alert-info">Nenhum resultado. Faça uma busca.</div>
+        <div class="alert alert-info">Nenhum resultado. Faça uma busca.</div>
         {/if}
 
         {#if !cols.isEmpty()}
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm table-hover" id="dataTable">
-                    <thead class="table-light">
-                    <tr>
-                        <th>Descrição</th>
-                        {#for col in cols}
-                            <th>{col}</th>
-                        {/for}
-                    </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                    {#for row in rows}
-                        <tr>
-                            <!-- Descrição: ellipsis + tooltip + badges (GTIN / count) -->
-                            <td class="description" title="{row.texDesc}">
-                                <span class="d-inline-block text-truncate" style="max-width:480px">{row.texDesc}</span>
-                                <span class="meta">
-                            {#if row.gtin}
-                                <span class="badge bg-secondary badge-gtin">GTIN {row.gtin}</span>
-                            {/if}</span>
-                            </td>
-
-                            <!-- Preços: usa p.cssClass se enviado pelo backend; garante classe 'price' por padrão -->
-                            {#for p in row.pricesList}
-                                <td class="{p.cssClass} price">{p.valor}</td>
-                            {/for}
-                        </tr>
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm table-hover" id="dataTable">
+                <thead class="table-light">
+                <tr>
+                    <th>Descrição</th>
+                    {#for col in cols}
+                    <th>{col}</th>
                     {/for}
-                    </tbody>
-                </table>
-            </div>
-            <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
-                Nenhum resultado encontrado para o seu filtro.
-            </div>
+                </tr>
+                </thead>
+                <tbody id="tableBody">
+                {#for row in rows}
+                <tr>
+                    <td style="min-width:300px">{row.texDesc}</td>
+                    {#for p in row.pricesList}
+                    <td>{p.valor}</td>
+                    {/for}
+                </tr>
+                {/for}
+                </tbody>
+            </table>
+        </div>
+        <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
+            Nenhum resultado encontrado para o seu filtro.
+        </div>
         {/if}
-
     </div>
 </div>
 
 <script>
-    // Função Debounce para otimizar a execução do filtro
     function debounce(func, delay) {
         let timeout;
         return function(...args) {
@@ -231,122 +179,75 @@
         const rowSearchInput = document.getElementById('rowSearchInput');
         const columnSearchInput = document.getElementById('columnSearchInput');
         const tableBody = document.getElementById('tableBody');
-        const tableRows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+        const tableRows = Array.from(table.getElementsByTagName('tbody')[0].getElementsByTagName('tr'));
         const noResultsMessage = document.getElementById('noResultsMessage');
         const headers = table.querySelectorAll('thead th');
 
-        // Função que oculta colunas cujo conteúdo (nas linhas VISÍVEIS) só tem '-' ou está vazio.
-        function hideEmptyColumns() {
-            // percorre colunas (a partir de 1 porque 0 é Descrição)
-            for (let col = 1; col < headers.length; col++) {
-                // se cabeçalho já está escondido pelo filtro de colunas, mantém escondido
-                if (headers[col].style.display === 'none') continue;
-
-                let columnHasValue = false;
-                for (const row of tableRows) {
-                    // só considera linhas visíveis
-                    if (row.style.display === 'none') continue;
-                    const cell = row.cells[col];
-                    if (!cell || cell.style.display === 'none') continue;
-
-                    const txt = cell.textContent.trim();
-                    // considera que tem valor útil se houver dígito (número) ou texto diferente de '-' e não vazio
-                    if (txt !== '' && txt !== '-' && /\d/.test(txt)) {
-                        columnHasValue = true;
-                        break;
-                    }
-                }
-
-                if (!columnHasValue) {
-                    // oculta coluna inteira
-                    headers[col].style.display = 'none';
-                    for (const row of tableRows) {
-                        if (row.cells[col]) row.cells[col].style.display = 'none';
-                    }
-                } else {
-                    // garante visível (caso já tenha sido escondida por hideEmptyColumns anteriormente e agora exista valor)
-                    headers[col].style.display = '';
-                    for (const row of tableRows) {
-                        if (row.cells[col]) {
-                            // só reexibe a célula se a coluna não foi explicitamente escondida pelo filtro de colunas
-                            row.cells[col].style.display = '';
-                        }
-                    }
-                }
-            }
-        }
-
-        // ===================================================================================
-        // FUNÇÃO CENTRALIZADA DE FILTROS
-        // ===================================================================================
         const updateTableVisibility = () => {
-            // 1. FILTRO DE COLUNAS (Executado primeiro)
+            const productSearchTerm = rowSearchInput.value.toLowerCase();
             const columnSearchString = columnSearchInput.value.toLowerCase();
             const columnSearchTerms = columnSearchString.split(',')
                 .map(term => term.trim())
                 .filter(term => term.length > 0);
 
+            const candidateRows = tableRows.filter(row =>
+                row.cells[0].textContent.toLowerCase().includes(productSearchTerm)
+            );
+
+            const visibleColumnIndices = new Set([0]);
             for (let i = 1; i < headers.length; i++) {
                 const header = headers[i];
                 const headerText = header.textContent.toLowerCase();
-                const shouldShowColumn = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
 
-                header.style.display = shouldShowColumn ? '' : 'none';
-                for (const row of tableRows) {
-                    if (row.cells[i]) {
-                        row.cells[i].style.display = shouldShowColumn ? '' : 'none';
+                const matchesColumnFilter = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
+                if (!matchesColumnFilter) continue;
+
+                let columnHasDataInCandidates = false;
+                for (const row of candidateRows) {
+                    if (row.cells[i] && row.cells[i].textContent.trim() !== '') {
+                        columnHasDataInCandidates = true;
+                        break;
                     }
+                }
+
+                if (columnHasDataInCandidates) {
+                    visibleColumnIndices.add(i);
                 }
             }
 
-            // 2. FILTRO DE LINHAS (Executado depois, considerando as colunas visíveis)
-            const productSearchTerm = rowSearchInput.value.toLowerCase();
-            let visibleRows = 0;
+            for (let i = 0; i < headers.length; i++) {
+                const shouldShow = visibleColumnIndices.has(i);
+                headers[i].style.display = shouldShow ? '' : 'none';
+            }
 
-            for (const row of tableRows) {
-                // Condição 1: A linha corresponde ao filtro de produto?
-                const matchesProductFilter = row.cells[0].textContent.toLowerCase().includes(productSearchTerm);
+            let visibleRowsCount = 0;
+            tableRows.forEach(row => {
+                const isCandidate = candidateRows.includes(row);
 
-                // Condição 2: A linha tem algum preço VISÍVEL?
                 let hasVisiblePrice = false;
-                for (let i = 1; i < row.cells.length; i++) {
-                    // Verifica se a célula tem conteúdo E se não está escondida pelo filtro de colunas
-                    if (row.cells[i].textContent.trim() !== '' && row.cells[i].style.display !== 'none') {
-                        // considera '-' como vazio; considera números como valor válido
-                        const txt = row.cells[i].textContent.trim();
-                        if (txt !== '-' && /\d/.test(txt)) {
+                if (isCandidate) {
+                    for (let i = 1; i < row.cells.length; i++) {
+                        if (visibleColumnIndices.has(i) && row.cells[i].textContent.trim() !== '') {
                             hasVisiblePrice = true;
                             break;
                         }
                     }
                 }
 
-                // A linha só aparece se ambas as condições forem verdadeiras
-                if (matchesProductFilter && hasVisiblePrice) {
+                if (isCandidate && hasVisiblePrice) {
                     row.style.display = '';
-                    visibleRows++;
+                    visibleRowsCount++;
                 } else {
                     row.style.display = 'none';
                 }
-            }
+            });
 
-            // 3. Oculta colunas que, nas linhas visíveis, só tenham '-' ou vazio
-            hideEmptyColumns();
-
-            noResultsMessage.style.display = visibleRows > 0 ? 'none' : 'block';
+            noResultsMessage.style.display = visibleRowsCount > 0 ? 'none' : 'block';
         };
-        // ===================================================================================
-        // FIM DA FUNÇÃO
-        // ===================================================================================
 
-        // Aplica a função centralizada com debounce para ambos os inputs
         rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
         columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
 
-        // Executa no load para aplicar comportamento inicial (esconde colunas totalmente vazias)
-        updateTableVisibility();
-
-        // --- ORDENAÇÃO DA TABELA (sem alterações) ---
         headers.forEach((header, columnIndex) => {
             header.classList.add('sortable');
             header.addEventListener('click', () => {

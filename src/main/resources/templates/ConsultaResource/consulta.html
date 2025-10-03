@@ -25,7 +25,7 @@
         }
         .page-title { color: var(--primary-color); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
         .btn-success { background-color: var(--success-color); border-color: var(--success-color); font-weight: 500; transition: all 0.2s ease-in-out; }
-        .btn-success:hover, .btn-secondary:hover { transform: translateY(-2px); }
+        .btn-success:hover, .btn-secondary:hover, .btn-outline-primary:hover, .btn-outline-danger:hover { transform: translateY(-2px); }
         .form-control:focus, .form-select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25); }
 
         /* Estilos para DataTables */
@@ -57,7 +57,6 @@
             background-color: #fcfdff;
         }
 
-        /* NOVO: Estilos para a tela de Loading */
         #loading-overlay {
             position: fixed;
             top: 0;
@@ -65,7 +64,7 @@
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.6);
-            z-index: 1056; /* Acima de outros componentes Bootstrap */
+            z-index: 1056;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -86,7 +85,13 @@
 
 
 <div class="main-container">
-    <h3 class="page-title text-center mb-4"><i class="bi bi-search"></i> Consulta de Preço</h3>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="page-title text-center mb-0"><i class="bi bi-search"></i> Consulta de Preço</h3>
+        <div class="d-flex gap-2">
+            <a href="/dia" class="btn btn-outline-primary"><i class="bi bi-calendar-date"></i> Consultas</a>
+            <a href="/" class="btn btn-outline-danger"><i class="bi bi-box-arrow-right"></i> Sair</a>
+        </div>
+    </div>
 
     <form id="formConsulta" action="/consulta" method="post" class="mb-5">
         <input type="hidden" name="token" id="mainToken" value="{token}" />
@@ -173,20 +178,15 @@
 
         // --- Lógica para o formulário de Upload ---
         $('#formUpload').on('submit', function(event) {
-            // Previne o envio imediato para podermos mostrar o loading
             event.preventDefault();
-
-            // Mostra a tela de loading
             $('#loading-overlay').show();
 
-            // Copia os valores do formulário principal para os campos ocultos do upload
             $('#uploadToken').val($('#mainToken').val());
             $('#uploadLongitude').val($('#longitude').val());
             $('#uploadLatitude').val($('#latitude').val());
             $('#uploadKmDistancia').val($('#nroKmDistancia').val());
             $('#uploadDiaPrz').val($('#nroDiaPrz').val());
 
-            // Envia o formulário
             this.submit();
         });
 
