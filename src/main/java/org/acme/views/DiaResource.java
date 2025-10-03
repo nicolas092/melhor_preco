@@ -104,7 +104,6 @@ public class DiaResource {
             }
 
             row.put("pricesList", pricesList);
-            row.put("count", Integer.toString(pr.count));
             rows.add(row);
         }
 
@@ -259,13 +258,22 @@ public class DiaResource {
         Object estabObj = itemOrDoc.get("estabelecimento");
         if (estabObj instanceof Document) {
             Document estab = (Document) estabObj;
-            nomeContrib = Objects.toString(estab.get("nomeContrib"), null);
-            if (nomeContrib == null || nomeContrib.isBlank()) {
-                nomeContrib = Objects.toString(estab.get("nomeFant"), "SEM_NOME");
+            String nc = Objects.toString(estab.get("nomeContrib"), "").trim();
+            String nl = Objects.toString(estab.get("nomeLograd"), "").trim();
+            if (nc == null || nc.isBlank()) nc = Objects.toString(estab.get("nomeFant"), "").trim();
+            if ((nc == null || nc.isBlank()) && (nl == null || nl.isBlank())) {
+                // fallback to CNPJ if nothing else
+                Object cnpjObj = estab.get("codCnpjEstab");
+                nomeContrib = cnpjObj == null ? "SEM_NOME" : Objects.toString(cnpjObj);
+            } else if (nl == null || nl.isBlank()) {
+                nomeContrib = nc;
+            } else {
+                nomeContrib = nc + " (" + nl + ")";
             }
         } else {
             nomeContrib = Objects.toString(itemOrDoc.get("nomeContrib"), nomeContrib);
         }
+        if (nomeContrib == null || nomeContrib.isBlank()) nomeContrib = "SEM_NOME";
         return nomeContrib;
     }
 
