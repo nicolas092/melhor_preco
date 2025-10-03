@@ -84,11 +84,8 @@ public class DiaResource {
         }
 
         // Busca documentos para cada dia do intervalo e junta em uma lista
-        List<Document> docs = new ArrayList<>();
-        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
-            List<Document> dayDocs = repo.findItemsByDatePrefix(d.toString(), 0);
-            if (dayDocs != null && !dayDocs.isEmpty()) docs.addAll(dayDocs);
-        }
+       List<Document> docs = repo.findItemsByDateRange(start, end);
+
 
         // --- processamento (sua lógica original mantida) ---
         Map<String, ProductRowData> products = new LinkedHashMap<>();

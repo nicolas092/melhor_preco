@@ -92,7 +92,7 @@
         thead th:first-child { position: sticky; left: 0; z-index: 10; }
         tbody td:first-child {
             position: sticky; left: 0; z-index: 5; background-color: var(--card-bg-color);
-            transition: background-color 0.1s linear;
+            transition: background-color: 0.1s linear;
         }
         tbody tr:hover td:first-child { background-color: var(--hover-bg-color); }
         td.description {
@@ -123,6 +123,10 @@
         @media (max-width: 900px) {
             td.description { max-width: 280px; }
             td.price { min-width: 95px; font-size: 0.92rem; }
+        }
+
+        .hidden {
+            display: none;
         }
     </style>
 </head>
@@ -198,7 +202,7 @@
                     </tbody>
                 </table>
             </div>
-            <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
+            <div id="noResultsMessage" class="alert alert-warning mt-3 hidden">
                 Nenhum resultado encontrado para o seu filtro.
             </div>
         {/if}
@@ -215,11 +219,12 @@
         };
     }
 
+    // CORREÇÃO APLICADA AQUI: Voltamos para a concatenação de strings
     function toIsoDate(d) {
         var yyyy = d.getFullYear();
         var mm = String(d.getMonth() + 1).padStart(2, '0');
         var dd = String(d.getDate()).padStart(2, '0');
-        return yyyy + '-' + mm + '-' + dd;
+        return yyyy + '-' + mm + '-' + dd; // Evita conflito com o Qute
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -227,15 +232,11 @@
             const diaInicioInput = document.getElementById('diaInicioInput');
             const diaFimInput = document.getElementById('diaFimInput');
             if (!diaInicioInput || !diaFimInput) return;
-
             const isEmpty = el => !el.value || el.value.trim() === "";
-
             if (!isEmpty(diaInicioInput) || !isEmpty(diaFimInput)) return;
-
             const now = new Date();
-            const threeDaysAgo = new Date(now);
+            const threeDaysAgo = new Date();
             threeDaysAgo.setDate(now.getDate() - 3);
-
             diaInicioInput.value = toIsoDate(threeDaysAgo);
             diaFimInput.value = toIsoDate(now);
         })();
@@ -248,134 +249,81 @@
         const tableBody = document.getElementById('tableBody');
         const noResultsMessage = document.getElementById('noResultsMessage');
 
-        function getHeadersArray() {
-            return Array.from(table.querySelectorAll('thead th'));
-        }
-        function getRowsArray() {
-            return Array.from(tableBody.querySelectorAll('tr'));
-        }
+        const headers = Array.from(table.querySelectorAll('thead th'));
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
 
-        function hideEmptyColumns(headersArr, rowsArr) {
-            for (let col = 1; col < headersArr.length; col++) {
-                const header = headersArr[col];
-                if (header.dataset.forcedHidden === 'true') continue;
-
-                let columnHasValue = false;
-                for (const row of rowsArr) {
-                    if (row.style.display === 'none') continue;
-                    const cell = row.cells[col];
-                    if (!cell || cell.style.display === 'none') continue;
-                    const txt = cell.textContent.trim();
-                    if (txt !== '' && txt !== '-' && /\d/.test(txt)) {
-                        columnHasValue = true;
-                        break;
-                    }
-                }
-
-                if (!columnHasValue) {
-                    header.style.display = 'none';
-                    header.dataset.autoHidden = 'true';
-                    rowsArr.forEach(row => {
-                        if (row.cells[col]) row.cells[col].style.display = 'none';
-                    });
-                } else {
-                    if (header.dataset.autoHidden === 'true') {
-                        delete header.dataset.autoHidden;
-                        header.style.display = '';
-                        rowsArr.forEach(row => {
-                            if (row.cells[col]) row.cells[col].style.display = '';
-                        });
-                    }
-                }
-            }
-        }
+        const rowsData = rows.map(row => ({
+            element: row,
+            desc: row.cells[0].textContent.toLowerCase(),
+        }));
 
         const updateTableVisibility = () => {
-            const headers = getHeadersArray();
-            const rows = getRowsArray();
-            const columnSearchString = (columnSearchInput?.value || '').toLowerCase();
-            const columnSearchTerms = columnSearchString.split(',').map(t => t.trim()).filter(Boolean);
+            const productSearchTerm = rowSearchInput.value.toLowerCase();
+            const columnSearchTerms = columnSearchInput.value.toLowerCase().split(',').map(t => t.trim()).filter(Boolean);
+            let visibleRowsCount = 0;
 
+            const visibleColumnIndexes = new Set([0]);
             headers.forEach((header, i) => {
                 if (i === 0) return;
                 const headerText = header.textContent.toLowerCase();
-                const shouldShowColumn = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
-
-                header.style.display = shouldShowColumn ? '' : 'none';
-                header.dataset.forcedHidden = shouldShowColumn ? 'false' : 'true';
-                rows.forEach(row => {
-                    if (row.cells[i]) row.cells[i].style.display = shouldShowColumn ? '' : 'none';
-                });
-            });
-
-            const productSearchTerm = (rowSearchInput?.value || '').toLowerCase();
-            let visibleRowsCount = 0;
-
-            rows.forEach(row => {
-                const descCell = row.cells[0];
-                const matchesProductFilter = descCell.textContent.toLowerCase().includes(productSearchTerm);
-
-                if (matchesProductFilter) {
-                    row.style.display = '';
-                    visibleRowsCount++;
-                } else {
-                    row.style.display = 'none';
+                const shouldShow = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
+                header.classList.toggle('hidden', !shouldShow);
+                if (shouldShow) {
+                    visibleColumnIndexes.add(i);
                 }
             });
 
-            hideEmptyColumns(headers, rows);
+            rowsData.forEach(rowData => {
+                const matchesProduct = rowData.desc.includes(productSearchTerm);
+                rowData.element.classList.toggle('hidden', !matchesProduct);
+                if (matchesProduct) {
+                    visibleRowsCount++;
+                }
+            });
 
-            noResultsMessage.style.display = visibleRowsCount > 0 ? 'none' : 'block';
+            rows.forEach(row => {
+                Array.from(row.cells).forEach((cell, i) => {
+                    if (i > 0) {
+                        cell.classList.toggle('hidden', !visibleColumnIndexes.has(i));
+                    }
+                });
+            });
+
+            noResultsMessage.classList.toggle('hidden', visibleRowsCount > 0);
         };
 
-        if (rowSearchInput) rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 200));
-        if (columnSearchInput) columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 200));
-
-        updateTableVisibility();
-
         function attachSortingListeners() {
-            const headers = getHeadersArray();
             headers.forEach((header, columnIndex) => {
-                if (header.dataset.sortAttached === 'true') return;
+                if (header.dataset.sortAttached) return;
                 header.classList.add('sortable');
-
                 header.addEventListener('click', () => {
                     const isAsc = header.classList.contains('sorted-asc');
                     const direction = isAsc ? 'desc' : 'asc';
                     headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
                     header.classList.add(direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
-
-                    const rowsArr = getRowsArray();
                     const multiplier = direction === 'asc' ? 1 : -1;
 
-                    rowsArr.sort((rowA, rowB) => {
+                    rows.sort((rowA, rowB) => {
                         const cellAContent = rowA.children[columnIndex]?.textContent.trim() || '';
                         const cellBContent = rowB.children[columnIndex]?.textContent.trim() || '';
-
-                        if (columnIndex === 0) {
-                            return cellAContent.localeCompare(cellBContent) * multiplier;
-                        }
-
+                        if (columnIndex === 0) return cellAContent.localeCompare(cellBContent) * multiplier;
                         const parseVal = txt => {
-                            if (!txt || txt === '-' || !/\d/.test(txt)) return null;
+                            if (!txt || txt === '-') return -Infinity;
                             const num = parseFloat(txt.replace('R$', '').trim().replace(/\./g, '').replace(',', '.'));
-                            return isNaN(num) ? null : num;
+                            return isNaN(num) ? -Infinity : num;
                         };
-
-                        const valueA = parseVal(cellAContent);
-                        const valueB = parseVal(cellBContent);
-
-                        if (valueA === null && valueB === null) return 0;
-                        if (valueA === null) return 1;
-                        if (valueB === null) return -1;
-                        return (valueA - valueB) * multiplier;
+                        return (parseVal(cellAContent) - parseVal(cellBContent)) * multiplier;
                     });
-
-                    rowsArr.forEach(row => tableBody.appendChild(row));
+                    rows.forEach(row => tableBody.appendChild(row));
                 });
                 header.dataset.sortAttached = 'true';
             });
         }
+
+        rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
+        columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
+
+        updateTableVisibility();
         attachSortingListeners();
     });
 </script>
