@@ -58,49 +58,53 @@ public class DiaResource {
 
         List<Document> docs = repo.findItemsByDatePrefix(datePrefix, 0);
 
-        Set<String> lojasSet = new TreeSet<>();
-        Map<String, Map<String, Double>> pivot = new TreeMap<>();
+        // --- Novo processamento ---
+        Map<String, ProductRowData> products = new LinkedHashMap<>();
         List<Group> groups = new ArrayList<>();
 
         for (Document doc : docs) {
-            // desdobrado
-            if (doc.containsKey("texDesc") && (doc.containsKey("nomeContrib") || doc.containsKey("estabelecimento"))) {
-                processSingleItemDocument(doc, lojasSet, pivot, groups);
-                continue;
-            }
-
             List<Document> itens = tryGetList(doc, "itens");
             if (itens != null && !itens.isEmpty()) {
-                for (Document item : itens) processItem(item, lojasSet, pivot, groups);
+                for (Document it : itens) addToProducts(products, it, groups);
                 continue;
             }
-
             List<Document> itensA = tryGetList(doc, "itensComAgrupamento");
             if (itensA != null && !itensA.isEmpty()) {
-                for (Document item : itensA) processItem(item, lojasSet, pivot, groups);
+                for (Document it : itensA) addToProducts(products, it, groups);
                 continue;
             }
-
-            if (doc.containsKey("vlrItem")) processItem(doc, lojasSet, pivot, groups);
+            if (doc.containsKey("vlrItem")) addToProducts(products, doc, groups);
         }
 
-        List<String> cols = new ArrayList<>(lojasSet);
-        NumberFormat fmt = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
+        // coleta colunas (lojas)
+        Set<String> lojasSet2 = new TreeSet<>();
+        for (ProductRowData pr : products.values()) lojasSet2.addAll(pr.prices.keySet());
+        List<String> cols = new ArrayList<>(lojasSet2);
 
+        NumberFormat fmt = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (Map.Entry<String, Map<String, Double>> e : pivot.entrySet()) {
+
+        for (ProductRowData pr : products.values()) {
             Map<String, Object> row = new HashMap<>();
-            row.put("texDesc", e.getKey());
+            row.put("texDesc", pr.displayName);
+            row.put("gtin", pr.gtin == null ? "" : pr.gtin.toString());
+
+            // menor preço da linha
+            Double min = pr.prices.values().stream().filter(Objects::nonNull).min(Double::compare).orElse(null);
 
             List<Map<String, String>> pricesList = new ArrayList<>();
             for (String loja : cols) {
                 Map<String, String> cell = new HashMap<>();
-                Double v = e.getValue().get(loja);
+                Double v = pr.prices.get(loja);
                 cell.put("loja", loja);
-                cell.put("valor", v == null ? "" : fmt.format(v));
+                cell.put("valor", v == null ? "-" : fmt.format(v));
+                boolean isMin = (v != null && min != null && Double.compare(v, min) == 0);
+                cell.put("cssClass", isMin ? "price-lowest price" : "price");
                 pricesList.add(cell);
             }
+
             row.put("pricesList", pricesList);
+            row.put("count", Integer.toString(pr.count));
             rows.add(row);
         }
 
@@ -111,6 +115,61 @@ public class DiaResource {
                 .render();
 
         return Response.ok(html).build();
+    }
+
+    // --- auxiliares novos ---
+    private static class ProductRowData {
+        final String key;
+        String displayName;
+        Long gtin;
+        Map<String, Double> prices = new HashMap<>();
+        int count = 0;
+        ProductRowData(String key, String displayName, Long gtin) {
+            this.key = key;
+            this.displayName = displayName;
+            this.gtin = gtin;
+        }
+        void addPrice(String loja, Double valor) {
+            if (loja == null) loja = "SEM_NOME";
+            if (valor == null) {
+                count++;
+                return;
+            }
+            Double prev = prices.get(loja);
+            if (prev == null || valor < prev) prices.put(loja, valor);
+            count++;
+        }
+    }
+
+    private void addToProducts(Map<String, ProductRowData> products, Document item, List<Group> groups) {
+        Long gtin = null;
+        Object gobj = item.get("gtin");
+        if (gobj instanceof Number) gtin = ((Number) gobj).longValue();
+        else if (gobj instanceof String) {
+            try { gtin = Long.parseLong(((String) gobj).trim()); } catch (Exception ignored) {}
+        }
+
+        String key;
+        if (gtin != null && gtin != 0L) {
+            key = "GTIN:" + gtin;
+        } else {
+            String pad = Objects.toString(item.get("produtoPadronizado"), "").trim();
+            if (!pad.isEmpty()) key = "PAD:" + pad;
+            else key = getProdutoGroupingKey(item, groups);
+        }
+
+        String display = Objects.toString(item.get("texDesc"), key);
+        String loja = extractNomeContrib(item);
+        Double vlr = toDouble(item.get("vlrItem"));
+
+        ProductRowData pr = products.get(key);
+        if (pr == null) {
+            pr = new ProductRowData(key, display, gtin);
+            products.put(key, pr);
+        } else {
+            if (display != null && display.length() < pr.displayName.length()) pr.displayName = display;
+        }
+        pr.addPrice(loja, vlr);
     }
 
     // -------- helpers --------
@@ -144,8 +203,8 @@ public class DiaResource {
 
     private String getProdutoGroupingKey(Document doc, List<Group> groups) {
         // 1) produtoPadronizado prioriza
-        String pad = Objects.toString(doc.get("produtoPadronizado"), null);
-        if (pad != null && !pad.isBlank()) return pad;
+        //String pad = Objects.toString(doc.get("produtoPadronizado"), null);
+        //if (pad != null && !pad.isBlank()) return pad;
 
         String texDesc = Objects.toString(doc.get("texDesc"), "").trim();
         if (texDesc.isEmpty()) {

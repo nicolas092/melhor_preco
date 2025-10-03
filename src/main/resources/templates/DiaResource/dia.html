@@ -64,7 +64,9 @@
             border-color: var(--primary-color);
             box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25);
         }
-        .table-responsive { max-height: 70vh; border-radius: 8px; }
+
+        /* Tabela: responsivo e legível */
+        .table-responsive { max-height: 70vh; border-radius: 8px; overflow: auto; }
         .table thead { position: sticky; top: 0; z-index: 20; }
         .table thead th {
             background: var(--header-bg-color);
@@ -77,8 +79,9 @@
             padding: 0.9rem 0.75rem;
         }
         .table tbody td {
-            padding: 0.8rem 0.75rem;
+            padding: 0.6rem 0.75rem;
             vertical-align: middle;
+            border-top: 1px solid var(--border-color);
         }
         .table-hover > tbody > tr:hover { background-color: var(--hover-bg-color); }
         .table thead th.sortable::after {
@@ -88,12 +91,53 @@
         .table thead th:hover::after { opacity: 1; }
         .table thead th.sorted-asc::after { opacity: 1; content: "\f148"; }
         .table thead th.sorted-desc::after { opacity: 1; content: "\f128"; }
+
+        /* sticky primeiro coluna (descrição) */
         thead th:first-child { position: sticky; left: 0; z-index: 10; }
         tbody td:first-child {
             position: sticky; left: 0; z-index: 5; background-color: var(--card-bg-color);
             transition: background-color 0.1s linear;
         }
         tbody tr:hover td:first-child { background-color: var(--hover-bg-color); }
+
+        /* descrição com ellipsis e tooltip */
+        td.description {
+            max-width: 520px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        td.description .meta {
+            display: inline-block;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        /* preços alinhados à direita e largura mínima */
+        td.price {
+            text-align: right;
+            white-space: nowrap;
+            min-width: 110px;
+            font-feature-settings: "tnum";
+        }
+        /* destaque do menor preço na linha */
+        td.price-lowest {
+            background: #e9f9ef;
+            font-weight: 700;
+            border-left: 4px solid #28a745;
+        }
+        /* placeholder para células vazias (caso backend não envie '-') */
+        td.price:empty::after { content: "-"; color: #6c757d; }
+
+        /* badges pequenos (GTIN / count) */
+        .badge-gtin { font-size: 0.65rem; padding: 0.25rem 0.35rem; }
+        .badge-count { font-size: 0.65rem; padding: 0.25rem 0.35rem; margin-left: 0.3rem; }
+
+        /* small responsiveness on very narrow screens */
+        @media (max-width: 900px) {
+            td.description { max-width: 280px; }
+            td.price { min-width: 95px; font-size: 0.92rem; }
+        }
     </style>
 </head>
 <body class="p-3">
@@ -144,9 +188,22 @@
                 <tbody id="tableBody">
                 {#for row in rows}
                 <tr>
-                    <td style="min-width:300px">{row.texDesc}</td>
+                    <!-- Descrição: ellipsis + tooltip + badges (GTIN / count) -->
+                    <td class="description" title="{row.texDesc}">
+                        <span class="d-inline-block text-truncate" style="max-width:480px">{row.texDesc}</span>
+                        <span class="meta">
+                            {#if row.gtin}
+                                <span class="badge bg-secondary badge-gtin">GTIN {row.gtin}</span>
+                            {/if}
+                            {#if row.count}
+                                <span class="badge bg-info text-dark badge-count">{row.count}</span>
+                            {/if}
+                        </span>
+                    </td>
+
+                    <!-- Preços: usa p.cssClass se enviado pelo backend; garante classe 'price' por padrão -->
                     {#for p in row.pricesList}
-                    <td>{p.valor}</td>
+                    <td class="{p.cssClass} price">{p.valor}</td>
                     {/for}
                 </tr>
                 {/for}
