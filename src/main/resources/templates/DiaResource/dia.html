@@ -171,44 +171,44 @@
         </div>
 
         {#if cols.isEmpty()}
-        <div class="alert alert-info">Nenhum resultado. Faça uma busca.</div>
+            <div class="alert alert-info">Nenhum resultado. Faça uma busca.</div>
         {/if}
 
         {#if !cols.isEmpty()}
-        <div class="table-responsive">
-            <table class="table table-bordered table-sm table-hover" id="dataTable">
-                <thead class="table-light">
-                <tr>
-                    <th>Descrição</th>
-                    {#for col in cols}
-                    <th>{col}</th>
-                    {/for}
-                </tr>
-                </thead>
-                <tbody id="tableBody">
-                {#for row in rows}
-                <tr>
-                    <!-- Descrição: ellipsis + tooltip + badges (GTIN / count) -->
-                    <td class="description" title="{row.texDesc}">
-                        <span class="d-inline-block text-truncate" style="max-width:480px">{row.texDesc}</span>
-                        <span class="meta">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-hover" id="dataTable">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Descrição</th>
+                        {#for col in cols}
+                            <th>{col}</th>
+                        {/for}
+                    </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    {#for row in rows}
+                        <tr>
+                            <!-- Descrição: ellipsis + tooltip + badges (GTIN / count) -->
+                            <td class="description" title="{row.texDesc}">
+                                <span class="d-inline-block text-truncate" style="max-width:480px">{row.texDesc}</span>
+                                <span class="meta">
                             {#if row.gtin}
                                 <span class="badge bg-secondary badge-gtin">GTIN {row.gtin}</span>
                             {/if}</span>
-                    </td>
+                            </td>
 
-                    <!-- Preços: usa p.cssClass se enviado pelo backend; garante classe 'price' por padrão -->
-                    {#for p in row.pricesList}
-                    <td class="{p.cssClass} price">{p.valor}</td>
+                            <!-- Preços: usa p.cssClass se enviado pelo backend; garante classe 'price' por padrão -->
+                            {#for p in row.pricesList}
+                                <td class="{p.cssClass} price">{p.valor}</td>
+                            {/for}
+                        </tr>
                     {/for}
-                </tr>
-                {/for}
-                </tbody>
-            </table>
-        </div>
-        <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
-            Nenhum resultado encontrado para o seu filtro.
-        </div>
+                    </tbody>
+                </table>
+            </div>
+            <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
+                Nenhum resultado encontrado para o seu filtro.
+            </div>
         {/if}
 
     </div>
@@ -234,6 +234,47 @@
         const tableRows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
         const noResultsMessage = document.getElementById('noResultsMessage');
         const headers = table.querySelectorAll('thead th');
+
+        // Função que oculta colunas cujo conteúdo (nas linhas VISÍVEIS) só tem '-' ou está vazio.
+        function hideEmptyColumns() {
+            // percorre colunas (a partir de 1 porque 0 é Descrição)
+            for (let col = 1; col < headers.length; col++) {
+                // se cabeçalho já está escondido pelo filtro de colunas, mantém escondido
+                if (headers[col].style.display === 'none') continue;
+
+                let columnHasValue = false;
+                for (const row of tableRows) {
+                    // só considera linhas visíveis
+                    if (row.style.display === 'none') continue;
+                    const cell = row.cells[col];
+                    if (!cell || cell.style.display === 'none') continue;
+
+                    const txt = cell.textContent.trim();
+                    // considera que tem valor útil se houver dígito (número) ou texto diferente de '-' e não vazio
+                    if (txt !== '' && txt !== '-' && /\d/.test(txt)) {
+                        columnHasValue = true;
+                        break;
+                    }
+                }
+
+                if (!columnHasValue) {
+                    // oculta coluna inteira
+                    headers[col].style.display = 'none';
+                    for (const row of tableRows) {
+                        if (row.cells[col]) row.cells[col].style.display = 'none';
+                    }
+                } else {
+                    // garante visível (caso já tenha sido escondida por hideEmptyColumns anteriormente e agora exista valor)
+                    headers[col].style.display = '';
+                    for (const row of tableRows) {
+                        if (row.cells[col]) {
+                            // só reexibe a célula se a coluna não foi explicitamente escondida pelo filtro de colunas
+                            row.cells[col].style.display = '';
+                        }
+                    }
+                }
+            }
+        }
 
         // ===================================================================================
         // FUNÇÃO CENTRALIZADA DE FILTROS
@@ -271,8 +312,12 @@
                 for (let i = 1; i < row.cells.length; i++) {
                     // Verifica se a célula tem conteúdo E se não está escondida pelo filtro de colunas
                     if (row.cells[i].textContent.trim() !== '' && row.cells[i].style.display !== 'none') {
-                        hasVisiblePrice = true;
-                        break; // Encontrou um preço, pode parar de procurar nesta linha
+                        // considera '-' como vazio; considera números como valor válido
+                        const txt = row.cells[i].textContent.trim();
+                        if (txt !== '-' && /\d/.test(txt)) {
+                            hasVisiblePrice = true;
+                            break;
+                        }
                     }
                 }
 
@@ -285,6 +330,9 @@
                 }
             }
 
+            // 3. Oculta colunas que, nas linhas visíveis, só tenham '-' ou vazio
+            hideEmptyColumns();
+
             noResultsMessage.style.display = visibleRows > 0 ? 'none' : 'block';
         };
         // ===================================================================================
@@ -295,6 +343,8 @@
         rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
         columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
 
+        // Executa no load para aplicar comportamento inicial (esconde colunas totalmente vazias)
+        updateTableVisibility();
 
         // --- ORDENAÇÃO DA TABELA (sem alterações) ---
         headers.forEach((header, columnIndex) => {

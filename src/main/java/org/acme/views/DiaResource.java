@@ -201,10 +201,18 @@ public class DiaResource {
     }
 
     private String getProdutoGroupingKey(Document doc, List<Group> groups) {
-        // 1) produtoPadronizado prioriza
-        //String pad = Objects.toString(doc.get("produtoPadronizado"), null);
-        //if (pad != null && !pad.isBlank()) return pad;
-
+        // 1) produtoPadronizado prioriza (se salvo pela consulta por descrição)
+        String padRaw = Objects.toString(doc.get("produtoPadronizado"), null);
+        if (padRaw != null && !padRaw.isBlank()) {
+            // normalize pad similar ao que se faz ao salvar
+            String normPad = Normalizer.normalize(padRaw, Normalizer.Form.NFKD)
+                    .replaceAll("\\p{M}", "")
+                    .replaceAll("[^A-Za-z0-9 ]", " ")
+                    .replaceAll("\\s+", " ")
+                    .trim()
+                    .toLowerCase();
+            if (!normPad.isEmpty()) return "PAD:" + normPad;
+        }
         String texDesc = Objects.toString(doc.get("texDesc"), "").trim();
         if (texDesc.isEmpty()) {
             return Objects.toString(doc.get("codIntItem"), Objects.toString(doc.get("codCnpjEstab"), "SEM_DESC"));
@@ -218,7 +226,6 @@ public class DiaResource {
         for (Group g : groups) {
             double overlap = intersectionRatio(tokens, g.tokens);
             if (overlap >= TOKEN_MATCH_THRESHOLD) {
-                // atualiza displayName (preferir a forma mais curta)
                 g.count++;
                 if (texDesc.length() < g.displayName.length()) g.displayName = texDesc;
                 g.tokens.addAll(tokens);
@@ -226,7 +233,7 @@ public class DiaResource {
             }
         }
 
-        // fallback por Levenshtein sobre normalized display name
+        // fallback por Levenshtein
         for (Group g : groups) {
             double levRatio = levenshteinRatio(normalized, g.normalized);
             if (levRatio >= LEVENSHTEIN_RATIO_THRESHOLD) {
@@ -245,7 +252,6 @@ public class DiaResource {
     }
 
     private String getProdutoGroupingKey(Document doc) {
-        // compatibilidade (sem groups) — usa normalizeEnhanced
         String pad = Objects.toString(doc.get("produtoPadronizado"), null);
         if (pad != null && !pad.isBlank()) return pad;
         String texDesc = Objects.toString(doc.get("texDesc"), "").trim();
@@ -261,17 +267,24 @@ public class DiaResource {
             String nc = Objects.toString(estab.get("nomeContrib"), "").trim();
             String nl = Objects.toString(estab.get("nomeLograd"), "").trim();
             if (nc == null || nc.isBlank()) nc = Objects.toString(estab.get("nomeFant"), "").trim();
+            String combined;
             if ((nc == null || nc.isBlank()) && (nl == null || nl.isBlank())) {
-                // fallback to CNPJ if nothing else
                 Object cnpjObj = estab.get("codCnpjEstab");
-                nomeContrib = cnpjObj == null ? "SEM_NOME" : Objects.toString(cnpjObj);
+                combined = cnpjObj == null ? "SEM_NOME" : Objects.toString(cnpjObj);
             } else if (nl == null || nl.isBlank()) {
-                nomeContrib = nc;
+                combined = nc;
             } else {
-                nomeContrib = nc + " (" + nl + ")";
+                combined = nc + " (" + nl + ")";
             }
+            combined = combined.replaceAll("\\.", "");
+            combined = combined.replaceAll("[\u00A0]", " ");
+            combined = combined.replaceAll("\\s+", " ").trim();
+            nomeContrib = combined;
         } else {
             nomeContrib = Objects.toString(itemOrDoc.get("nomeContrib"), nomeContrib);
+            if (nomeContrib != null) {
+                nomeContrib = nomeContrib.replaceAll("\\.", "").replaceAll("\\s+", " ").trim();
+            }
         }
         if (nomeContrib == null || nomeContrib.isBlank()) nomeContrib = "SEM_NOME";
         return nomeContrib;
@@ -296,29 +309,24 @@ public class DiaResource {
 
     private static String normalizeEnhanced(String s) {
         if (s == null) return "";
-        // remove acentos
         String n = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         n = n.toLowerCase();
 
-        // unifica variantes de "600 ml", "600ML", "600 ML" -> "600ml"
         n = n.replaceAll("\\b(\\d{1,4})\\s*ml\\b", "$1ml");
         n = n.replaceAll("\\b(\\d{1,4})\\s*ml\\.?\\b", "$1ml");
         n = n.replaceAll("\\b(\\d{1,4})\\s*ml\\b", "$1ml");
 
-        // remove pontuação e caracteres estranhos
         n = NON_ALNUM.matcher(n).replaceAll(" ");
         n = n.replaceAll("\\s+", " ").trim();
         return n;
     }
 
     private static String mergeNormalized(String a, String b) {
-        // keep shorter or union — simples: prefer shorter
         if (a == null || a.isEmpty()) return b;
         if (b == null || b.isEmpty()) return a;
         return a.length() <= b.length() ? a : b;
     }
 
-    // Levenshtein ratio util
     private static double levenshteinRatio(String a, String b) {
         if (a == null) a = "";
         if (b == null) b = "";
@@ -332,7 +340,6 @@ public class DiaResource {
         int len0 = s0.length() + 1;
         int len1 = s1.length() + 1;
 
-        // matriz
         int[] prev = new int[len1];
         int[] cur = new int[len1];
 
