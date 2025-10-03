@@ -133,7 +133,6 @@
 <body class="p-3">
 <div class="container-fluid">
     <div class="main-container">
-
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h3 class="page-title mb-0"><i class="bi bi-calendar-check"></i> Consulta de Preços</h3>
             <a href="javascript:history.back()" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Voltar</a>
@@ -219,12 +218,11 @@
         };
     }
 
-    // CORREÇÃO APLICADA AQUI: Voltamos para a concatenação de strings
     function toIsoDate(d) {
         var yyyy = d.getFullYear();
         var mm = String(d.getMonth() + 1).padStart(2, '0');
         var dd = String(d.getDate()).padStart(2, '0');
-        return yyyy + '-' + mm + '-' + dd; // Evita conflito com o Qute
+        return yyyy + '-' + mm + '-' + dd;
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -257,6 +255,39 @@
             desc: row.cells[0].textContent.toLowerCase(),
         }));
 
+        // #### LÓGICA RESTAURADA ####
+        // Esta função verifica se uma coluna ficou totalmente vazia após um filtro e a esconde.
+        function hideEmptyColumns() {
+            headers.forEach((header, colIndex) => {
+                if (colIndex === 0 || header.classList.contains('hidden')) {
+                    return; // Pula a descrição e colunas já escondidas pelo filtro principal
+                }
+
+                let columnHasVisibleValue = false;
+                for (const row of rows) {
+                    // Considera apenas as linhas que estão visíveis
+                    if (!row.classList.contains('hidden')) {
+                        const cell = row.cells[colIndex];
+                        const text = cell?.textContent.trim();
+                        if (text && text !== '-') {
+                            columnHasVisibleValue = true;
+                            break; // Encontrou um valor, não precisa checar mais
+                        }
+                    }
+                }
+
+                // Se a coluna não tem nenhum valor visível, esconde o cabeçalho e todas as suas células
+                if (!columnHasVisibleValue) {
+                    header.classList.add('hidden');
+                    rows.forEach(row => {
+                        if(row.cells[colIndex]) {
+                            row.cells[colIndex].classList.add('hidden');
+                        }
+                    });
+                }
+            });
+        }
+
         const updateTableVisibility = () => {
             const productSearchTerm = rowSearchInput.value.toLowerCase();
             const columnSearchTerms = columnSearchInput.value.toLowerCase().split(',').map(t => t.trim()).filter(Boolean);
@@ -267,7 +298,7 @@
                 if (i === 0) return;
                 const headerText = header.textContent.toLowerCase();
                 const shouldShow = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
-                header.classList.toggle('hidden', !shouldShow);
+                header.classList.toggle('hidden', !shouldShow); // Mostra/esconde baseado no filtro
                 if (shouldShow) {
                     visibleColumnIndexes.add(i);
                 }
@@ -288,6 +319,10 @@
                     }
                 });
             });
+
+            // #### CHAMADA DA FUNÇÃO RESTAURADA ####
+            // Executa a verificação de colunas vazias no final de cada atualização
+            hideEmptyColumns();
 
             noResultsMessage.classList.toggle('hidden', visibleRowsCount > 0);
         };
