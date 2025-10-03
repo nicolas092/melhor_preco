@@ -152,10 +152,14 @@
         <div class="controls-panel">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-auto col-md-12">
-                    <form method="post" action="/dia" class="d-flex g-2">
-                        <div>
-                            <label for="diaInput" class="form-label fw-bold">Selecione o Dia</label>
-                            <input type="date" name="dia" id="diaInput" class="form-control" value="{dia}" />
+                    <form method="post" action="/dia" class="d-flex g-2 align-items-end">
+                        <div class="me-2">
+                            <label for="diaInicioInput" class="form-label fw-bold">Data Inicial</label>
+                            <input type="date" name="datainicio" id="diaInicioInput" class="form-control" value="{diaInicio}" />
+                        </div>
+                        <div class="me-2">
+                            <label for="diaFimInput" class="form-label fw-bold">Data Final</label>
+                            <input type="date" name="datafim" id="diaFimInput" class="form-control" value="{diaFim}" />
                         </div>
                         <div class="align-self-end ms-2">
                             <button class="btn btn-primary px-4"><i class="bi bi-search me-1"></i>Buscar</button>
@@ -174,49 +178,50 @@
         </div>
 
         {#if cols.isEmpty()}
-        <div class="alert alert-info">Nenhum resultado. Faça uma busca.</div>
+            <div class="alert alert-info">Nenhum resultado. Faça uma busca.</div>
         {/if}
 
         {#if !cols.isEmpty()}
-        <div class="table-responsive">
-            <table class="table table-bordered table-sm table-hover" id="dataTable">
-                <thead class="table-light">
-                <tr>
-                    <th>Descrição</th>
-                    {#for col in cols}
-                    <th>{col}</th>
-                    {/for}
-                </tr>
-                </thead>
-                <tbody id="tableBody">
-                {#for row in rows}
-                <tr>
-                    <td class="description" title="{row.texDesc}">
-                        <span class="d-inline-block text-truncate" style="max-width:480px">{row.texDesc}</span>
-                        <span class="meta">
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-hover" id="dataTable">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Descrição</th>
+                        {#for col in cols}
+                            <th>{col}</th>
+                        {/for}
+                    </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    {#for row in rows}
+                        <tr>
+                            <td class="description" title="{row.texDesc}">
+                                <span class="d-inline-block text-truncate" style="max-width:480px">{row.texDesc}</span>
+                                <span class="meta">
                             {#if row.gtin}
                                 <span class="badge bg-secondary badge-gtin">GTIN {row.gtin}</span>
-                            {/if}</span>
-                    </td>
+                            {/if}
+                        </span>
+                            </td>
 
-                    {#for p in row.pricesList}
-                    <td class="{p.cssClass} price">{p.valor}</td>
+                            {#for p in row.pricesList}
+                                <td class="{p.cssClass} price">{p.valor}</td>
+                            {/for}
+                        </tr>
                     {/for}
-                </tr>
-                {/for}
-                </tbody>
-            </table>
-        </div>
-        <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
-            Nenhum resultado encontrado para o seu filtro.
-        </div>
+                    </tbody>
+                </table>
+            </div>
+            <div id="noResultsMessage" class="alert alert-warning mt-3" style="display: none;">
+                Nenhum resultado encontrado para o seu filtro.
+            </div>
         {/if}
 
     </div>
 </div>
 
 <script>
-    // Função Debounce para otimizar a execução do filtro
+    // Debounce
     function debounce(func, delay) {
         let timeout;
         return function(...args) {
@@ -225,33 +230,65 @@
         };
     }
 
+    // formata Date -> YYYY-MM-DD (concatenação para evitar placeholders Qute)
+    function toIsoDate(d) {
+        var yyyy = d.getFullYear();
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return yyyy + '-' + mm + '-' + dd;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+        // Primeira coisa: garantir que os inputs de data tenham um valor padrão (sempre executa)
+        (function setDefaultDateRange() {
+            const diaInicioInput = document.getElementById('diaInicioInput');
+            const diaFimInput = document.getElementById('diaFimInput');
+            if (!diaInicioInput || !diaFimInput) return;
+
+            // considera vazio se null, undefined, string vazia ou apenas espaços
+            const isEmpty = el => {
+                try { return !el.value || el.value.trim() === ""; }
+                catch (e) { return true; }
+            };
+
+            // Se pelo menos um já tem valor, não sobrescrever (respeita valor vindo do servidor)
+            if (!isEmpty(diaInicioInput) || !isEmpty(diaFimInput)) return;
+
+            const now = new Date();
+            const threeDaysAgo = new Date(now);
+            threeDaysAgo.setDate(now.getDate() - 3);
+
+            diaInicioInput.value = toIsoDate(threeDaysAgo);
+            diaFimInput.value = toIsoDate(now);
+        })();
+
+        // Depois, só se existir tabela rodamos o restante (filtros/ocultações/ordenação)
         const table = document.getElementById('dataTable');
-        if (!table) return;
+        if (!table) return; // sem resultados — nada mais a fazer no JS da tabela
 
         const rowSearchInput = document.getElementById('rowSearchInput');
         const columnSearchInput = document.getElementById('columnSearchInput');
         const tableBody = document.getElementById('tableBody');
-        const tableRows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
         const noResultsMessage = document.getElementById('noResultsMessage');
-        const headers = table.querySelectorAll('thead th');
 
-        // Função que oculta colunas cujo conteúdo (nas linhas VISÍVEIS) só tem '-' ou está vazio.
-        function hideEmptyColumns() {
-            // percorre colunas (a partir de 1 porque 0 é Descrição)
-            for (let col = 1; col < headers.length; col++) {
-                // se cabeçalho já está escondido pelo filtro de colunas, mantém escondido
-                if (headers[col].style.display === 'none') continue;
+        function getHeadersArray() {
+            return Array.from(table.querySelectorAll('thead th'));
+        }
+        function getRowsArray() {
+            return Array.from(tableBody.querySelectorAll('tr'));
+        }
+
+        function hideEmptyColumns(headersArr, rowsArr) {
+            for (let col = 1; col < headersArr.length; col++) {
+                const header = headersArr[col];
+                if (header.dataset && header.dataset.forcedHidden === 'true') continue;
 
                 let columnHasValue = false;
-                for (const row of tableRows) {
-                    // só considera linhas visíveis
+                for (const row of rowsArr) {
                     if (row.style.display === 'none') continue;
                     const cell = row.cells[col];
                     if (!cell || cell.style.display === 'none') continue;
-
                     const txt = cell.textContent.trim();
-                    // considera que tem valor útil se houver dígito (número) ou texto diferente de '-' e não vazio
                     if (txt !== '' && txt !== '-' && /\d/.test(txt)) {
                         columnHasValue = true;
                         break;
@@ -259,119 +296,139 @@
                 }
 
                 if (!columnHasValue) {
-                    // oculta coluna inteira
-                    headers[col].style.display = 'none';
-                    for (const row of tableRows) {
+                    header.style.display = 'none';
+                    header.dataset.autoHidden = 'true';
+                    for (const row of rowsArr) {
                         if (row.cells[col]) row.cells[col].style.display = 'none';
                     }
                 } else {
-                    // garante visível (caso já tenha sido escondida por hideEmptyColumns anteriormente e agora exista valor)
-                    headers[col].style.display = '';
-                    for (const row of tableRows) {
-                        if (row.cells[col]) {
-                            // só reexibe a célula se a coluna não foi explicitamente escondida pelo filtro de colunas
-                            row.cells[col].style.display = '';
+                    if (header.dataset && header.dataset.autoHidden === 'true') {
+                        delete header.dataset.autoHidden;
+                        header.style.display = '';
+                        for (const row of rowsArr) {
+                            if (row.cells[col]) row.cells[col].style.display = '';
                         }
                     }
                 }
             }
         }
 
-        // ===================================================================================
-        // FUNÇÃO CENTRALIZADA DE FILTROS
-        // ===================================================================================
         const updateTableVisibility = () => {
-            // 1. FILTRO DE COLUNAS (Executado primeiro)
-            const columnSearchString = columnSearchInput.value.toLowerCase();
-            const columnSearchTerms = columnSearchString.split(',')
-                .map(term => term.trim())
-                .filter(term => term.length > 0);
+            const headers = getHeadersArray();
+            const rows = getRowsArray();
+
+            const columnSearchString = (columnSearchInput && columnSearchInput.value || '').toLowerCase();
+            const columnSearchTerms = columnSearchString.split(',').map(t => t.trim()).filter(t => t.length > 0);
 
             for (let i = 1; i < headers.length; i++) {
                 const header = headers[i];
                 const headerText = header.textContent.toLowerCase();
                 const shouldShowColumn = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
 
-                header.style.display = shouldShowColumn ? '' : 'none';
-                for (const row of tableRows) {
-                    if (row.cells[i]) {
-                        row.cells[i].style.display = shouldShowColumn ? '' : 'none';
+                if (shouldShowColumn) {
+                    if (!header.dataset || header.dataset.forcedHidden !== 'true') {
+                        header.style.display = '';
+                        for (const row of rows) {
+                            if (row.cells[i] && row.cells[i].style.display !== 'none') {
+                                row.cells[i].style.display = '';
+                            }
+                        }
+                    }
+                    if (header.dataset) delete header.dataset.forcedHidden;
+                } else {
+                    header.style.display = 'none';
+                    if (header.dataset) header.dataset.forcedHidden = 'true';
+                    for (const row of rows) {
+                        if (row.cells[i]) row.cells[i].style.display = 'none';
                     }
                 }
             }
 
-            // 2. FILTRO DE LINHAS (Executado depois, considerando as colunas visíveis)
-            const productSearchTerm = rowSearchInput.value.toLowerCase();
-            let visibleRows = 0;
+            const productSearchTerm = (rowSearchInput && rowSearchInput.value || '').toLowerCase();
+            let visibleRowsCount = 0;
 
-            for (const row of tableRows) {
-                // Condição 1: A linha corresponde ao filtro de produto?
+            for (const row of rows) {
                 const matchesProductFilter = row.cells[0].textContent.toLowerCase().includes(productSearchTerm);
 
-                // Condição 2: A linha tem algum preço VISÍVEL?
                 let hasVisiblePrice = false;
-                for (let i = 1; i < row.cells.length; i++) {
-                    // Verifica se a célula tem conteúdo E se não está escondida pelo filtro de colunas
-                    if (row.cells[i].textContent.trim() !== '' && row.cells[i].style.display !== 'none') {
-                        // considera '-' como vazio; considera números como valor válido
-                        const txt = row.cells[i].textContent.trim();
-                        if (txt !== '-' && /\d/.test(txt)) {
-                            hasVisiblePrice = true;
-                            break;
-                        }
+                for (let i = 1; i < headers.length; i++) {
+                    const header = headers[i];
+                    if (header.style.display === 'none') continue;
+                    const cell = row.cells[i];
+                    if (!cell || cell.style.display === 'none') continue;
+                    const txt = cell.textContent.trim();
+                    if (txt !== '' && txt !== '-' && /\d/.test(txt)) {
+                        hasVisiblePrice = true;
+                        break;
                     }
                 }
 
-                // A linha só aparece se ambas as condições forem verdadeiras
                 if (matchesProductFilter && hasVisiblePrice) {
                     row.style.display = '';
-                    visibleRows++;
+                    visibleRowsCount++;
                 } else {
                     row.style.display = 'none';
                 }
             }
 
-            // 3. Oculta colunas que, nas linhas visíveis, só tenham '-' ou vazio
-            hideEmptyColumns();
+            hideEmptyColumns(headers, rows);
 
-            noResultsMessage.style.display = visibleRows > 0 ? 'none' : 'block';
+            noResultsMessage.style.display = visibleRowsCount > 0 ? 'none' : 'block';
         };
-        // ===================================================================================
-        // FIM DA FUNÇÃO
-        // ===================================================================================
 
-        // Aplica a função centralizada com debounce para ambos os inputs
-        rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
-        columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 250));
+        if (rowSearchInput) rowSearchInput.addEventListener('input', debounce(updateTableVisibility, 200));
+        if (columnSearchInput) columnSearchInput.addEventListener('input', debounce(updateTableVisibility, 200));
 
-        // Executa no load para aplicar comportamento inicial (esconde colunas totalmente vazias)
         updateTableVisibility();
 
-        // --- ORDENAÇÃO DA TABELA (sem alterações) ---
-        headers.forEach((header, columnIndex) => {
-            header.classList.add('sortable');
-            header.addEventListener('click', () => {
-                const currentDirection = header.classList.contains('sorted-asc') ? 'desc' : 'asc';
-                headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
-                header.classList.add(currentDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
-                const rows = Array.from(tableBody.querySelectorAll('tr'));
-                rows.sort((rowA, rowB) => {
-                    const cellAContent = rowA.children[columnIndex].textContent.trim();
-                    const cellBContent = rowB.children[columnIndex].textContent.trim();
-                    if (columnIndex === 0) {
-                        return cellAContent.localeCompare(cellBContent) * (currentDirection === 'asc' ? 1 : -1);
-                    }
-                    const valueA = cellAContent === '' ? null : parseFloat(cellAContent.replace('R$', '').trim().replace(',', '.'));
-                    const valueB = cellBContent === '' ? null : parseFloat(cellBContent.replace('R$', '').trim().replace(',', '.'));
-                    if (valueA === null && valueB === null) return 0;
-                    if (valueA === null) return 1;
-                    if (valueB === null) return -1;
-                    const comparison = valueA - valueB;
-                    return currentDirection === 'asc' ? comparison : -comparison;
+        function attachSortingListeners() {
+            const headers = getHeadersArray();
+
+            headers.forEach((header, columnIndex) => {
+                if (header.dataset.sortAttached === 'true') return;
+                header.classList.add('sortable');
+
+                header.addEventListener('click', () => {
+                    const currentDirection = header.classList.contains('sorted-asc') ? 'desc' : 'asc';
+                    headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+                    header.classList.add(currentDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+
+                    const rowsArr = Array.from(tableBody.querySelectorAll('tr'));
+
+                    rowsArr.sort((rowA, rowB) => {
+                        const aCell = rowA.children[columnIndex];
+                        const bCell = rowB.children[columnIndex];
+                        const cellAContent = aCell ? aCell.textContent.trim() : '';
+                        const cellBContent = bCell ? bCell.textContent.trim() : '';
+
+                        if (columnIndex === 0) {
+                            return cellAContent.localeCompare(cellBContent) * (currentDirection === 'asc' ? 1 : -1);
+                        }
+
+                        const parseVal = txt => {
+                            if (!txt || txt === '-' || !/\d/.test(txt)) return null;
+                            const num = parseFloat(txt.replace('R$', '').trim().replace(/\./g, '').replace(',', '.'));
+                            return isNaN(num) ? null : num;
+                        };
+
+                        const valueA = parseVal(cellAContent);
+                        const valueB = parseVal(cellBContent);
+
+                        if (valueA === null && valueB === null) return 0;
+                        if (valueA === null) return 1;
+                        if (valueB === null) return -1;
+                        const comparison = valueA - valueB;
+                        return currentDirection === 'asc' ? comparison : -comparison;
+                    });
+
+                    rowsArr.forEach(row => tableBody.appendChild(row));
                 });
-                rows.forEach(row => tableBody.appendChild(row));
+
+                header.dataset.sortAttached = 'true';
             });
-        });
+        }
+
+        attachSortingListeners();
     });
 </script>
 

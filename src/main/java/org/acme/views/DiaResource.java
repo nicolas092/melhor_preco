@@ -11,6 +11,8 @@ import io.quarkus.qute.TemplateInstance;
 
 import java.text.NumberFormat;
 import java.text.Normalizer;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -32,7 +34,8 @@ public class DiaResource {
         String html = Templates.dia()
                 .data("cols", Collections.emptyList())
                 .data("rows", Collections.emptyList())
-                .data("dia", "")
+                .data("diaInicio", "")
+                .data("diaFim", "")
                 .render();
         return Response.ok(html).build();
     }
@@ -46,19 +49,56 @@ public class DiaResource {
             "cerveja","garrafa","pack","promo","promocao","promoção","cx","frasco"
     ));
 
+    /**
+     * Agora aceita dois campos do formulário:
+     * - datainicio (name="datainicio")
+     * - datafim   (name="datafim")
+     *
+     * Se apenas datainicio for informado, usa só aquele dia.
+     * Se datafim vier antes de datainicio, faz swap (flexível).
+     */
     @POST
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_HTML)
-    public Response buscar(@FormParam("dia") String diaInput) {
-        String datePrefix = normalizeToIsoDatePrefix(diaInput);
-        if (datePrefix == null) {
+    public Response buscar(@FormParam("datainicio") String diaInicioInput,
+                           @FormParam("datafim") String diaFimInput) {
+
+        // normaliza para ISO (YYYY-MM-DD) se possível
+        String startIso = normalizeToIsoDatePrefix(diaInicioInput);
+        String endIso = normalizeToIsoDatePrefix(diaFimInput);
+
+        if (startIso == null && endIso == null) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("Formato de data inválido. Use ddMMyy ou YYYY-MM-DD").build();
+                    .entity("Formato de data inválido. Informe datainicio ou datafim (ddMMyy ou YYYY-MM-DD).").build();
         }
 
-        List<Document> docs = repo.findItemsByDatePrefix(datePrefix, 0);
+        if (startIso == null) startIso = endIso;
+        if (endIso == null) endIso = startIso;
 
-        // --- Novo processamento ---
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.parse(startIso);
+            end = LocalDate.parse(endIso);
+        } catch (DateTimeParseException ex) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Erro ao parsear datas. Use ddMMyy ou YYYY-MM-DD.").build();
+        }
+
+        // se inverteram, troca para ficar start <= end
+        if (end.isBefore(start)) {
+            LocalDate tmp = start; start = end; end = tmp;
+            String tmpIso = startIso; startIso = endIso; endIso = tmpIso;
+        }
+
+        // Busca documentos para cada dia do intervalo e junta em uma lista (pode haver duplicatas entre dias)
+        List<Document> docs = new ArrayList<>();
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            List<Document> dayDocs = repo.findItemsByDatePrefix(d.toString(), 0);
+            if (dayDocs != null && !dayDocs.isEmpty()) docs.addAll(dayDocs);
+        }
+
+        // --- processamento (mantive sua lógica) ---
         Map<String, ProductRowData> products = new LinkedHashMap<>();
         List<Group> groups = new ArrayList<>();
 
@@ -107,10 +147,12 @@ public class DiaResource {
             rows.add(row);
         }
 
+        // passa os dados e também as duas datas pro template
         String html = Templates.dia()
                 .data("cols", cols)
                 .data("rows", rows)
-                .data("dia", datePrefix)
+                .data("diaInicio", startIso)
+                .data("diaFim", endIso)
                 .render();
 
         return Response.ok(html).build();
@@ -171,7 +213,7 @@ public class DiaResource {
         pr.addPrice(loja, vlr);
     }
 
-    // -------- helpers --------
+    // -------- helpers (mantive suas implementações, incluindo normalizações) --------
 
     private void processSingleItemDocument(Document doc, Set<String> lojasSet,
                                            Map<String, Map<String, Double>> pivot, List<Group> groups) {
