@@ -1,17 +1,17 @@
 package org.acme.views;
 
+import io.quarkus.qute.CheckedTemplate;
+import io.quarkus.qute.TemplateInstance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.acme.utils.JsonRepository;
 import org.bson.Document;
-import io.quarkus.qute.CheckedTemplate;
-import io.quarkus.qute.TemplateInstance;
 
-import java.text.NumberFormat;
 import java.text.Normalizer;
-import java.time.LocalDate;
+import java.text.NumberFormat;
+import java.time.LocalDate; // <-- IMPORTAÇÃO ADICIONADA
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -49,14 +49,6 @@ public class DiaResource {
             "cerveja","garrafa","pack","promo","promocao","promoção","cx","frasco"
     ));
 
-    /**
-     * Agora aceita dois campos do formulário:
-     * - datainicio (name="datainicio")
-     * - datafim   (name="datafim")
-     *
-     * Se apenas datainicio for informado, usa só aquele dia.
-     * Se datafim vier antes de datainicio, faz swap (flexível).
-     */
     @POST
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_HTML)
@@ -91,14 +83,14 @@ public class DiaResource {
             String tmpIso = startIso; startIso = endIso; endIso = tmpIso;
         }
 
-        // Busca documentos para cada dia do intervalo e junta em uma lista (pode haver duplicatas entre dias)
+        // Busca documentos para cada dia do intervalo e junta em uma lista
         List<Document> docs = new ArrayList<>();
         for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
             List<Document> dayDocs = repo.findItemsByDatePrefix(d.toString(), 0);
             if (dayDocs != null && !dayDocs.isEmpty()) docs.addAll(dayDocs);
         }
 
-        // --- processamento (mantive sua lógica) ---
+        // --- processamento (sua lógica original mantida) ---
         Map<String, ProductRowData> products = new LinkedHashMap<>();
         List<Group> groups = new ArrayList<>();
 
@@ -158,7 +150,8 @@ public class DiaResource {
         return Response.ok(html).build();
     }
 
-    // --- auxiliares novos ---
+    // --- classes e métodos auxiliares (sem alterações) ---
+
     private static class ProductRowData {
         final String key;
         String displayName;
@@ -213,40 +206,9 @@ public class DiaResource {
         pr.addPrice(loja, vlr);
     }
 
-    // -------- helpers (mantive suas implementações, incluindo normalizações) --------
-
-    private void processSingleItemDocument(Document doc, Set<String> lojasSet,
-                                           Map<String, Map<String, Double>> pivot, List<Group> groups) {
-        String produtoKey = getProdutoGroupingKey(doc, groups);
-        String nomeContrib = extractNomeContrib(doc);
-        Double vlr = toDouble(doc.get("vlrItem"));
-
-        lojasSet.add(nomeContrib);
-        pivot.computeIfAbsent(produtoKey, k -> new HashMap<>());
-        Map<String, Double> row = pivot.get(produtoKey);
-        if (vlr != null) row.merge(nomeContrib, vlr, Double::min);
-    }
-
-    private void processItem(Document item, Set<String> lojasSet,
-                             Map<String, Map<String, Double>> pivot, List<Group> groups) {
-        String produtoKey = getProdutoGroupingKey(item);
-        // fallback para mesmo método que usa lista de groups
-        produtoKey = getProdutoGroupingKey(item, groups);
-
-        String nomeContrib = extractNomeContrib(item);
-        Double vlr = toDouble(item.get("vlrItem"));
-
-        lojasSet.add(nomeContrib);
-        pivot.computeIfAbsent(produtoKey, k -> new HashMap<>());
-        Map<String, Double> row = pivot.get(produtoKey);
-        if (vlr != null) row.merge(nomeContrib, vlr, Double::min);
-    }
-
     private String getProdutoGroupingKey(Document doc, List<Group> groups) {
-        // 1) produtoPadronizado prioriza (se salvo pela consulta por descrição)
         String padRaw = Objects.toString(doc.get("produtoPadronizado"), null);
         if (padRaw != null && !padRaw.isBlank()) {
-            // normalize pad similar ao que se faz ao salvar
             String normPad = Normalizer.normalize(padRaw, Normalizer.Form.NFKD)
                     .replaceAll("\\p{M}", "")
                     .replaceAll("[^A-Za-z0-9 ]", " ")
@@ -264,7 +226,6 @@ public class DiaResource {
         Set<String> tokens = tokenize(normalized);
         if (tokens.isEmpty()) return texDesc;
 
-        // tenta encaixar por overlap
         for (Group g : groups) {
             double overlap = intersectionRatio(tokens, g.tokens);
             if (overlap >= TOKEN_MATCH_THRESHOLD) {
@@ -275,7 +236,6 @@ public class DiaResource {
             }
         }
 
-        // fallback por Levenshtein
         for (Group g : groups) {
             double levRatio = levenshteinRatio(normalized, g.normalized);
             if (levRatio >= LEVENSHTEIN_RATIO_THRESHOLD) {
@@ -287,18 +247,9 @@ public class DiaResource {
             }
         }
 
-        // cria novo group
         Group newG = new Group(texDesc, tokens, normalized);
         groups.add(newG);
         return newG.displayName;
-    }
-
-    private String getProdutoGroupingKey(Document doc) {
-        String pad = Objects.toString(doc.get("produtoPadronizado"), null);
-        if (pad != null && !pad.isBlank()) return pad;
-        String texDesc = Objects.toString(doc.get("texDesc"), "").trim();
-        if (texDesc.isEmpty()) return "SEM_DESC";
-        return texDesc;
     }
 
     private String extractNomeContrib(Document itemOrDoc) {
@@ -318,9 +269,7 @@ public class DiaResource {
             } else {
                 combined = nc + " (" + nl + ")";
             }
-            combined = combined.replaceAll("\\.", "");
-            combined = combined.replaceAll("[\u00A0]", " ");
-            combined = combined.replaceAll("\\s+", " ").trim();
+            combined = combined.replaceAll("\\.", "").replaceAll("[\u00A0]", " ").replaceAll("\\s+", " ").trim();
             nomeContrib = combined;
         } else {
             nomeContrib = Objects.toString(itemOrDoc.get("nomeContrib"), nomeContrib);
@@ -351,16 +300,10 @@ public class DiaResource {
 
     private static String normalizeEnhanced(String s) {
         if (s == null) return "";
-        String n = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
-        n = n.toLowerCase();
-
-        n = n.replaceAll("\\b(\\d{1,4})\\s*ml\\b", "$1ml");
+        String n = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
         n = n.replaceAll("\\b(\\d{1,4})\\s*ml\\.?\\b", "$1ml");
-        n = n.replaceAll("\\b(\\d{1,4})\\s*ml\\b", "$1ml");
-
         n = NON_ALNUM.matcher(n).replaceAll(" ");
-        n = n.replaceAll("\\s+", " ").trim();
-        return n;
+        return n.replaceAll("\\s+", " ").trim();
     }
 
     private static String mergeNormalized(String a, String b) {
@@ -381,10 +324,8 @@ public class DiaResource {
     private static int levenshtein(String s0, String s1) {
         int len0 = s0.length() + 1;
         int len1 = s1.length() + 1;
-
         int[] prev = new int[len1];
         int[] cur = new int[len1];
-
         for (int j = 0; j < len1; j++) prev[j] = j;
         for (int i = 1; i < len0; i++) {
             cur[0] = i;

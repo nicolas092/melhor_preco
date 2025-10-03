@@ -64,8 +64,6 @@
             border-color: var(--primary-color);
             box-shadow: 0 0 0 0.25rem rgba(0, 90, 156, 0.25);
         }
-
-        /* Tabela: responsivo e legível */
         .table-responsive { max-height: 70vh; border-radius: 8px; overflow: auto; }
         .table thead { position: sticky; top: 0; z-index: 20; }
         .table thead th {
@@ -91,16 +89,12 @@
         .table thead th:hover::after { opacity: 1; }
         .table thead th.sorted-asc::after { opacity: 1; content: "\f148"; }
         .table thead th.sorted-desc::after { opacity: 1; content: "\f128"; }
-
-        /* sticky primeiro coluna (descrição) */
         thead th:first-child { position: sticky; left: 0; z-index: 10; }
         tbody td:first-child {
             position: sticky; left: 0; z-index: 5; background-color: var(--card-bg-color);
             transition: background-color 0.1s linear;
         }
         tbody tr:hover td:first-child { background-color: var(--hover-bg-color); }
-
-        /* descrição com ellipsis e tooltip */
         td.description {
             max-width: 520px;
             overflow: hidden;
@@ -112,28 +106,20 @@
             margin-left: 0.5rem;
             vertical-align: middle;
         }
-
-        /* preços alinhados à direita e largura mínima */
         td.price {
             text-align: right;
             white-space: nowrap;
             min-width: 110px;
             font-feature-settings: "tnum";
         }
-        /* destaque do menor preço na linha */
         td.price-lowest {
             background: #e9f9ef;
             font-weight: 700;
             border-left: 4px solid #28a745;
         }
-        /* placeholder para células vazias (caso backend não envie '-') */
         td.price:empty::after { content: "-"; color: #6c757d; }
-
-        /* badges pequenos (GTIN / count) */
         .badge-gtin { font-size: 0.65rem; padding: 0.25rem 0.35rem; }
         .badge-count { font-size: 0.65rem; padding: 0.25rem 0.35rem; margin-left: 0.3rem; }
-
-        /* small responsiveness on very narrow screens */
         @media (max-width: 900px) {
             td.description { max-width: 280px; }
             td.price { min-width: 95px; font-size: 0.92rem; }
@@ -221,7 +207,6 @@
 </div>
 
 <script>
-    // Debounce
     function debounce(func, delay) {
         let timeout;
         return function(...args) {
@@ -230,7 +215,6 @@
         };
     }
 
-    // formata Date -> YYYY-MM-DD (concatenação para evitar placeholders Qute)
     function toIsoDate(d) {
         var yyyy = d.getFullYear();
         var mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -239,19 +223,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Primeira coisa: garantir que os inputs de data tenham um valor padrão (sempre executa)
         (function setDefaultDateRange() {
             const diaInicioInput = document.getElementById('diaInicioInput');
             const diaFimInput = document.getElementById('diaFimInput');
             if (!diaInicioInput || !diaFimInput) return;
 
-            // considera vazio se null, undefined, string vazia ou apenas espaços
-            const isEmpty = el => {
-                try { return !el.value || el.value.trim() === ""; }
-                catch (e) { return true; }
-            };
+            const isEmpty = el => !el.value || el.value.trim() === "";
 
-            // Se pelo menos um já tem valor, não sobrescrever (respeita valor vindo do servidor)
             if (!isEmpty(diaInicioInput) || !isEmpty(diaFimInput)) return;
 
             const now = new Date();
@@ -262,9 +240,8 @@
             diaFimInput.value = toIsoDate(now);
         })();
 
-        // Depois, só se existir tabela rodamos o restante (filtros/ocultações/ordenação)
         const table = document.getElementById('dataTable');
-        if (!table) return; // sem resultados — nada mais a fazer no JS da tabela
+        if (!table) return;
 
         const rowSearchInput = document.getElementById('rowSearchInput');
         const columnSearchInput = document.getElementById('columnSearchInput');
@@ -281,7 +258,7 @@
         function hideEmptyColumns(headersArr, rowsArr) {
             for (let col = 1; col < headersArr.length; col++) {
                 const header = headersArr[col];
-                if (header.dataset && header.dataset.forcedHidden === 'true') continue;
+                if (header.dataset.forcedHidden === 'true') continue;
 
                 let columnHasValue = false;
                 for (const row of rowsArr) {
@@ -298,16 +275,16 @@
                 if (!columnHasValue) {
                     header.style.display = 'none';
                     header.dataset.autoHidden = 'true';
-                    for (const row of rowsArr) {
+                    rowsArr.forEach(row => {
                         if (row.cells[col]) row.cells[col].style.display = 'none';
-                    }
+                    });
                 } else {
-                    if (header.dataset && header.dataset.autoHidden === 'true') {
+                    if (header.dataset.autoHidden === 'true') {
                         delete header.dataset.autoHidden;
                         header.style.display = '';
-                        for (const row of rowsArr) {
+                        rowsArr.forEach(row => {
                             if (row.cells[col]) row.cells[col].style.display = '';
-                        }
+                        });
                     }
                 }
             }
@@ -316,60 +293,35 @@
         const updateTableVisibility = () => {
             const headers = getHeadersArray();
             const rows = getRowsArray();
+            const columnSearchString = (columnSearchInput?.value || '').toLowerCase();
+            const columnSearchTerms = columnSearchString.split(',').map(t => t.trim()).filter(Boolean);
 
-            const columnSearchString = (columnSearchInput && columnSearchInput.value || '').toLowerCase();
-            const columnSearchTerms = columnSearchString.split(',').map(t => t.trim()).filter(t => t.length > 0);
-
-            for (let i = 1; i < headers.length; i++) {
-                const header = headers[i];
+            headers.forEach((header, i) => {
+                if (i === 0) return;
                 const headerText = header.textContent.toLowerCase();
                 const shouldShowColumn = columnSearchTerms.length === 0 || columnSearchTerms.some(term => headerText.includes(term));
 
-                if (shouldShowColumn) {
-                    if (!header.dataset || header.dataset.forcedHidden !== 'true') {
-                        header.style.display = '';
-                        for (const row of rows) {
-                            if (row.cells[i] && row.cells[i].style.display !== 'none') {
-                                row.cells[i].style.display = '';
-                            }
-                        }
-                    }
-                    if (header.dataset) delete header.dataset.forcedHidden;
-                } else {
-                    header.style.display = 'none';
-                    if (header.dataset) header.dataset.forcedHidden = 'true';
-                    for (const row of rows) {
-                        if (row.cells[i]) row.cells[i].style.display = 'none';
-                    }
-                }
-            }
+                header.style.display = shouldShowColumn ? '' : 'none';
+                header.dataset.forcedHidden = shouldShowColumn ? 'false' : 'true';
+                rows.forEach(row => {
+                    if (row.cells[i]) row.cells[i].style.display = shouldShowColumn ? '' : 'none';
+                });
+            });
 
-            const productSearchTerm = (rowSearchInput && rowSearchInput.value || '').toLowerCase();
+            const productSearchTerm = (rowSearchInput?.value || '').toLowerCase();
             let visibleRowsCount = 0;
 
-            for (const row of rows) {
-                const matchesProductFilter = row.cells[0].textContent.toLowerCase().includes(productSearchTerm);
+            rows.forEach(row => {
+                const descCell = row.cells[0];
+                const matchesProductFilter = descCell.textContent.toLowerCase().includes(productSearchTerm);
 
-                let hasVisiblePrice = false;
-                for (let i = 1; i < headers.length; i++) {
-                    const header = headers[i];
-                    if (header.style.display === 'none') continue;
-                    const cell = row.cells[i];
-                    if (!cell || cell.style.display === 'none') continue;
-                    const txt = cell.textContent.trim();
-                    if (txt !== '' && txt !== '-' && /\d/.test(txt)) {
-                        hasVisiblePrice = true;
-                        break;
-                    }
-                }
-
-                if (matchesProductFilter && hasVisiblePrice) {
+                if (matchesProductFilter) {
                     row.style.display = '';
                     visibleRowsCount++;
                 } else {
                     row.style.display = 'none';
                 }
-            }
+            });
 
             hideEmptyColumns(headers, rows);
 
@@ -383,26 +335,25 @@
 
         function attachSortingListeners() {
             const headers = getHeadersArray();
-
             headers.forEach((header, columnIndex) => {
                 if (header.dataset.sortAttached === 'true') return;
                 header.classList.add('sortable');
 
                 header.addEventListener('click', () => {
-                    const currentDirection = header.classList.contains('sorted-asc') ? 'desc' : 'asc';
+                    const isAsc = header.classList.contains('sorted-asc');
+                    const direction = isAsc ? 'desc' : 'asc';
                     headers.forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
-                    header.classList.add(currentDirection === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                    header.classList.add(direction === 'asc' ? 'sorted-asc' : 'sorted-desc');
 
-                    const rowsArr = Array.from(tableBody.querySelectorAll('tr'));
+                    const rowsArr = getRowsArray();
+                    const multiplier = direction === 'asc' ? 1 : -1;
 
                     rowsArr.sort((rowA, rowB) => {
-                        const aCell = rowA.children[columnIndex];
-                        const bCell = rowB.children[columnIndex];
-                        const cellAContent = aCell ? aCell.textContent.trim() : '';
-                        const cellBContent = bCell ? bCell.textContent.trim() : '';
+                        const cellAContent = rowA.children[columnIndex]?.textContent.trim() || '';
+                        const cellBContent = rowB.children[columnIndex]?.textContent.trim() || '';
 
                         if (columnIndex === 0) {
-                            return cellAContent.localeCompare(cellBContent) * (currentDirection === 'asc' ? 1 : -1);
+                            return cellAContent.localeCompare(cellBContent) * multiplier;
                         }
 
                         const parseVal = txt => {
@@ -417,17 +368,14 @@
                         if (valueA === null && valueB === null) return 0;
                         if (valueA === null) return 1;
                         if (valueB === null) return -1;
-                        const comparison = valueA - valueB;
-                        return currentDirection === 'asc' ? comparison : -comparison;
+                        return (valueA - valueB) * multiplier;
                     });
 
                     rowsArr.forEach(row => tableBody.appendChild(row));
                 });
-
                 header.dataset.sortAttached = 'true';
             });
         }
-
         attachSortingListeners();
     });
 </script>
