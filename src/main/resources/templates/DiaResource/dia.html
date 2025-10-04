@@ -150,8 +150,13 @@
                             <label for="diaFimInput" class="form-label fw-bold">Data Final</label>
                             <input type="date" name="datafim" id="diaFimInput" class="form-control" value="{diaFim}" />
                         </div>
-                        <div class="align-self-end ms-2">
-                            <button class="btn btn-primary px-4"><i class="bi bi-search me-1"></i>Buscar</button>
+                        <div class="align-self-end ms-2 d-flex gap-2">
+                            <button class="btn btn-primary px-4" type="submit">
+                                <i class="bi bi-search me-1"></i>Buscar
+                            </button>
+                            <button class="btn btn-success px-4" type="submit" formaction="/dia/download">
+                                <i class="bi bi-download me-1"></i>Download
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -200,6 +205,11 @@
                     {/for}
                     </tbody>
                 </table>
+            </div>
+            <div class="mt-3 text-end">
+                <button id="downloadFilteredBtn" class="btn btn-warning">
+                    <i class="bi bi-download me-1"></i>Download Filtrado
+                </button>
             </div>
             <div id="noResultsMessage" class="alert alert-warning mt-3 hidden">
                 Nenhum resultado encontrado para o seu filtro.
@@ -360,6 +370,50 @@
 
         updateTableVisibility();
         attachSortingListeners();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const downloadBtn = document.getElementById('downloadFilteredBtn');
+        if (!downloadBtn) return;
+
+        downloadBtn.addEventListener('click', () => {
+            const table = document.getElementById('dataTable');
+            if (!table) {
+                alert('Tabela não encontrada para exportar.');
+                return;
+            }
+
+            const allHeaders = Array.from(table.querySelectorAll('thead th'));
+            const visibleMask = allHeaders.map(h => !h.classList.contains('hidden'));
+
+            const headerTexts = allHeaders
+                .filter((h, i) => visibleMask[i])
+                .map(h => '"' + h.textContent.trim().replace(/"/g, '""') + '"');
+
+            let csvContent = '\uFEFF' + headerTexts.join(';') + '\r\n';
+
+            const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+                .filter(r => !r.classList.contains('hidden'));
+
+            visibleRows.forEach(row => {
+                const cells = Array.from(row.children);
+                const selectedCells = cells.filter((c, i) => visibleMask[i]);
+                const line = selectedCells
+                    .map(td => '"' + td.textContent.trim().replace(/"/g, '""') + '"')
+                    .join(';');
+                csvContent += line + '\r\n';
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'consulta_filtrada.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
     });
 </script>
 

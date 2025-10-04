@@ -31,11 +31,14 @@ public class DiaResource {
     @GET
     @Produces(MediaType.TEXT_HTML)
     public Response form() {
+        LocalDate hoje = LocalDate.now();
+        LocalDate tresDiasAntes = hoje.minusDays(3);
+
         String html = Templates.dia()
                 .data("cols", Collections.emptyList())
                 .data("rows", Collections.emptyList())
-                .data("diaInicio", "")
-                .data("diaFim", "")
+                .data("diaInicio", tresDiasAntes.toString()) // yyyy-MM-dd
+                .data("diaFim", hoje.toString())
                 .render();
         return Response.ok(html).build();
     }
@@ -385,5 +388,85 @@ public class DiaResource {
             this.normalized = normalized;
             this.count = 1;
         }
+    }
+
+    @POST
+    @Path("/download")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces("text/csv;charset=UTF-8")
+    public Response downloadCsv(@FormParam("datainicio") String diaInicioInput,
+                                @FormParam("datafim") String diaFimInput) {
+
+        // normaliza datas (mesma lógica do buscar)
+        String startIso = normalizeToIsoDatePrefix(diaInicioInput);
+        String endIso = normalizeToIsoDatePrefix(diaFimInput);
+        if (startIso == null && endIso == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Formato de data inválido. Informe datainicio ou datafim (ddMMyy ou YYYY-MM-DD).").build();
+        }
+        if (startIso == null) startIso = endIso;
+        if (endIso == null) endIso = startIso;
+
+        // parse localdate
+        java.time.LocalDate start = java.time.LocalDate.parse(startIso);
+        java.time.LocalDate end = java.time.LocalDate.parse(endIso);
+        if (end.isBefore(start)) {
+            java.time.LocalDate tmp = start; start = end; end = tmp;
+        }
+
+        // busca docs no repo (presumes que você tem método findItemsByDateRange)
+        List<Document> docs = repo.findItemsByDateRange(start, end);
+
+        // monta produtos (mesma lógica do buscar) -> copia o processamento mínimo
+        Map<String, ProductRowData> products = new LinkedHashMap<>();
+        List<Group> groups = new ArrayList<>();
+        for (Document doc : docs) {
+            List<Document> itens = tryGetList(doc, "itens");
+            if (itens != null && !itens.isEmpty()) {
+                for (Document it : itens) addToProducts(products, it, groups);
+                continue;
+            }
+            List<Document> itensA = tryGetList(doc, "itensComAgrupamento");
+            if (itensA != null && !itensA.isEmpty()) {
+                for (Document it : itensA) addToProducts(products, it, groups);
+                continue;
+            }
+            if (doc.containsKey("vlrItem")) addToProducts(products, doc, groups);
+        }
+
+        // cols
+        Set<String> lojasSet = new TreeSet<>();
+        for (ProductRowData pr : products.values()) lojasSet.addAll(pr.prices.keySet());
+        List<String> cols = new ArrayList<>(lojasSet);
+
+        // monta CSV
+        StringBuilder sb = new StringBuilder();
+        // BOM para Excel/UTF-8
+        sb.append('\uFEFF');
+
+        // cabeçalho
+        // primeiro cabeçalho: Descrição
+        sb.append("\"Descrição\"");
+        for (String c : cols) {
+            sb.append(';').append('"').append(c.replace("\"","\"\"")).append('"');
+        }
+        sb.append("\r\n");
+
+        java.text.NumberFormat fmt = java.text.NumberFormat.getCurrencyInstance(new Locale("pt","BR"));
+
+        // linhas
+        for (ProductRowData pr : products.values()) {
+            sb.append('"').append(pr.displayName.replace("\"","\"\"")).append('"');
+            for (String loja : cols) {
+                Double v = pr.prices.get(loja);
+                String cell = v == null ? "-" : fmt.format(v);
+                sb.append(';').append('"').append(cell.replace("\"","\"\"")).append('"');
+            }
+            sb.append("\r\n");
+        }
+
+        return Response.ok(sb.toString())
+                .header("Content-Disposition", "attachment; filename=\"consulta_" + startIso + "_to_" + endIso + ".csv\"")
+                .build();
     }
 }
